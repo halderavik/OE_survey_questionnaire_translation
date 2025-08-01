@@ -29,8 +29,8 @@ A professional web application built with Flask that enables researchers and sur
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd OE_questions_trans
+   git clone https://github.com/halderavik/OE_survey_questionnaire_translation.git
+   cd OE_survey_questionnaire_translation
    ```
 
 2. **Create a virtual environment**
@@ -57,7 +57,12 @@ A professional web application built with Flask that enables researchers and sur
 
 5. **Configure environment variables**
    
-   The `.env` file is already configured with the DeepSeek API key. If you need to modify it:
+   Copy the example environment file and configure it:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Edit the `.env` file with your configuration:
    ```bash
    # DeepSeek API Configuration
    DEEPSEEK_API_KEY=your_api_key_here
@@ -159,17 +164,19 @@ The application includes comprehensive error handling for:
 
 ### Project Structure
 ```
-OE_questions_trans/
+OE_survey_questionnaire_translation/
 ├── app.py                 # Main Flask application
 ├── requirements.txt       # Python dependencies
-├── .env                  # Environment variables
+├── .env.example          # Example environment variables
 ├── .gitignore           # Git ignore rules
 ├── README.md            # Project documentation
 ├── templates/
 │   └── index.html       # Main application template
 ├── planning.md          # Technical planning document
 ├── prd.md              # Product requirements document
-└── task.md             # Development tasks
+├── task.md             # Development tasks
+└── tests/
+    └── test_app.py      # Unit tests
 ```
 
 ### Running Tests
