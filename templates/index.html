@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Question Translator</title>
+    <!-- XLSX library for file preview -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 10px;
+            padding: 60px 20px;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8f2ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 0.9rem;
+            color: #999;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 10px 20px rgba(108, 117, 125, 0.3);
+        }
+
+        .progress-container {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .results-info {
+            color: #666;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        .results-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .results-table th:hover {
+            background: #e9ecef;
+        }
+
+        .results-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: top;
+        }
+
+        .results-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .confidence-high {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .confidence-medium {
+            color: #ffc107;
+            font-weight: 600;
+        }
+
+        .confidence-low {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .file-preview {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .file-preview h4 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .preview-list {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .preview-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .preview-list li:last-child {
+            border-bottom: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .main-card {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .results-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .btn {
+                width: 100%;
+                margin: 5px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Survey Question Translator</h1>
+            <p>AI-powered translation for survey questions with language detection</p>
+        </div>
+
+        <div class="main-card">
+            <div class="upload-section">
+                <h2>Upload Your Excel File</h2>
+                <p>Upload an Excel file (.xlsx or .xls) containing survey questions in a single column</p>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">Drag and drop your Excel file here</div>
+                    <div class="upload-hint">or click to browse</div>
+                </div>
+                
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls">
+                
+                <div class="file-preview" id="filePreview">
+                    <h4>File Preview (first 5 questions):</h4>
+                    <ul class="preview-list" id="previewList"></ul>
+                </div>
+                
+                <button class="btn" id="processBtn" style="display: none;">Process Questions</button>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Processing questions...</div>
+            </div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <div class="results-info">
+                        <h3>Translation Results</h3>
+                        <p id="resultsSummary"></p>
+                    </div>
+                    <div>
+                        <button class="btn" id="downloadBtn">Download Excel</button>
+                        <button class="btn btn-secondary" id="newFileBtn">Process New File</button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="results-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)">Original Question ↕</th>
+                                <th onclick="sortTable(1)">Detected Language ↕</th>
+                                <th onclick="sortTable(2)">Confidence (%) ↕</th>
+                                <th onclick="sortTable(3)">English Translation ↕</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentResults = [];
+        let sortDirection = 1;
+
+        // Check if XLSX library is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof XLSX === 'undefined') {
+                console.error('XLSX library not loaded');
+                showError('Excel library failed to load. Please refresh the page.');
+            } else {
+                console.log('XLSX library loaded successfully');
+            }
+        });
+
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const filePreview = document.getElementById('filePreview');
+        const previewList = document.getElementById('previewList');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/i)) {
+                showError('Please select an Excel file (.xlsx or .xls)');
+                return;
+            }
+
+            if (file.size > 2 * 1024 * 1024) {
+                showError('File size must be less than 2MB');
+                return;
+            }
+
+            // Check if XLSX library is loaded
+            if (typeof XLSX === 'undefined') {
+                showError('Excel library not loaded. Please refresh the page and try again.');
+                return;
+            }
+
+            // Show file preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    const questions = jsonData.map(row => row[0]).filter(q => q && q.toString().trim());
+                    
+                    if (questions.length === 0) {
+                        showError('No questions found in the Excel file');
+                        return;
+                    }
+
+                    if (questions.length > 1000) {
+                        showError('Maximum 1000 questions allowed per file');
+                        return;
+                    }
+
+                    // Show preview
+                    previewList.innerHTML = '';
+                    const previewCount = Math.min(5, questions.length);
+                    for (let i = 0; i < previewCount; i++) {
+                        const li = document.createElement('li');
+                        li.textContent = questions[i];
+                        previewList.appendChild(li);
+                    }
+                    
+                    filePreview.style.display = 'block';
+                    processBtn.style.display = 'inline-block';
+                    
+                    // Store file for processing
+                    window.selectedFile = file;
+                    
+                } catch (error) {
+                    console.error('Excel file reading error:', error);
+                    showError('Error reading Excel file: ' + error.message);
+                }
+            };
+            
+            reader.onerror = function() {
+                showError('Error reading file. Please try again.');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Process questions
+        processBtn.addEventListener('click', async () => {
+            if (!window.selectedFile) {
+                showError('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', window.selectedFile);
+
+            showProgress();
+            processBtn.disabled = true;
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResults(result);
+                } else {
+                    showError(result.error || 'Upload failed');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideProgress();
+                processBtn.disabled = false;
+            }
+        });
+
+        // Download results
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ results: currentResults })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `survey_translation_results_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    showError(error.error || 'Download failed');
+                }
+            } catch (error) {
+                showError('Download error: ' + error.message);
+            }
+        });
+
+        // New file button
+        document.getElementById('newFileBtn').addEventListener('click', () => {
+            resetForm();
+        });
+
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = 'Processing questions...';
+            
+            // Simulate progress
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                document.getElementById('progressFill').style.width = progress + '%';
+            }, 500);
+            
+            window.progressInterval = interval;
+        }
+
+        function hideProgress() {
+            document.getElementById('progressContainer').style.display = 'none';
+            if (window.progressInterval) {
+                clearInterval(window.progressInterval);
+            }
+        }
+
+        function showResults(result) {
+            currentResults = result.results;
+            
+            document.getElementById('resultsSummary').textContent = 
+                `Processed ${result.total_questions} questions on ${new Date(result.processed_at).toLocaleString()}`;
+            
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            
+            result.results.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(row.original_question)}</td>
+                    <td>${escapeHtml(row.detected_language)}</td>
+                    <td class="${getConfidenceClass(row.confidence)}">${row.confidence}%</td>
+                    <td>${escapeHtml(row.english_translation)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            document.getElementById('resultsSection').style.display = 'block';
+            document.querySelector('.upload-section').style.display = 'none';
+        }
+
+        function getConfidenceClass(confidence) {
+            if (confidence >= 80) return 'confidence-high';
+            if (confidence >= 60) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            const container = document.querySelector('.main-card');
+            container.insertBefore(errorDiv, container.firstChild);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        function resetForm() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('filePreview').style.display = 'none';
+            document.getElementById('processBtn').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.querySelector('.upload-section').style.display = 'block';
+            currentResults = [];
+            window.selectedFile = null;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function sortTable(columnIndex) {
+            const table = document.getElementById('resultsTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.sort((a, b) => {
+                const aValue = a.cells[columnIndex].textContent.trim();
+                const bValue = b.cells[columnIndex].textContent.trim();
+                
+                let comparison = 0;
+                if (columnIndex === 2) { // Confidence column (numeric)
+                    comparison = parseFloat(aValue) - parseFloat(bValue);
+                } else {
+                    comparison = aValue.localeCompare(bValue);
+                }
+                
+                return comparison * sortDirection;
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+            sortDirection *= -1;
+        }
+    </script>
+</body>
+</html> 

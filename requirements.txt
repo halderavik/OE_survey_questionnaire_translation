@@ -1,0 +1,16 @@
+# Core Flask & Web
+Flask==2.3.2
+Flask-WTF==1.1.1
+Werkzeug==2.3.6
+
+# File Processing
+pandas>=2.1.0
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# API & HTTP
+requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.0
+gunicorn==21.2.0 
