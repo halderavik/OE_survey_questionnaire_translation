@@ -182,6 +182,76 @@ def continue_batch():
         print(f"❌ Error continuing batch: {str(e)}")
         return jsonify({'error': f'Batch continuation error: {str(e)}'}), 500
 
+@app.route('/auto-continue-batch', methods=['POST'])
+def auto_continue_batch():
+    """Automatically continue processing batches until completion."""
+    try:
+        print("\n" + "="*50)
+        print("🤖 AUTO BATCH PROCESSING")
+        print("="*50)
+        
+        # Check if there are pending questions
+        if not hasattr(app, 'pending_questions') or not hasattr(app, 'current_batch_start'):
+            return jsonify({'error': 'No pending questions to process'}), 400
+        
+        total_questions = len(app.pending_questions)
+        current_batch_start = app.current_batch_start
+        
+        if current_batch_start >= total_questions:
+            return jsonify({'error': 'All questions have been processed'}), 400
+        
+        print(f"📊 Auto-continuing from question {current_batch_start + 1}")
+        print(f"📊 Remaining questions: {total_questions - current_batch_start}")
+        
+        # Create a temporary file path for the batch processing
+        dummy_filepath = "/tmp/auto_batch_continuation.xlsx"
+        
+        # Process batches automatically until completion
+        all_results = []
+        batch_count = 0
+        
+        while current_batch_start < total_questions:
+            batch_count += 1
+            print(f"\n🔄 Processing auto-batch {batch_count}")
+            
+            # Process the current batch
+            result = process_excel_file_with_timeout(dummy_filepath)
+            
+            if not result.get('success', False):
+                print(f"❌ Batch {batch_count} failed")
+                return jsonify(result)
+            
+            # Add batch results
+            all_results.extend(result.get('results', []))
+            
+            # Check if all batches are complete
+            if result.get('batch_complete', False):
+                print(f"✅ All batches completed after {batch_count} iterations")
+                break
+            
+            # Update current_batch_start for next iteration
+            current_batch_start = app.current_batch_start
+            
+            # Small delay between batches to prevent overwhelming the system
+            time.sleep(0.5)
+        
+        # Return final results
+        final_result = {
+            'success': True,
+            'results': all_results,
+            'total_questions': total_questions,
+            'processed_at': datetime.now().isoformat(),
+            'batch_complete': True,
+            'auto_processed': True,
+            'batches_processed': batch_count
+        }
+        
+        return jsonify(final_result)
+        
+    except Exception as e:
+        print(f"❌ Error in auto batch processing: {str(e)}")
+        return jsonify({'error': f'Auto batch processing error: {str(e)}'}), 500
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     """Handle file upload and process survey questions."""
