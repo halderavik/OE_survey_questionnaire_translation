@@ -402,10 +402,17 @@ def process_question(question, question_number, row_number=None):
                 language_info = json.loads(language_content)
                 print(f"  ✅ JSON parsed successfully: {language_info}")
                 
-                # Ensure confidence is an integer
+                # Ensure confidence is an integer percentage (0-100)
                 if 'confidence' in language_info:
-                    language_info['confidence'] = int(language_info['confidence'])
-                    print(f"  📊 Confidence converted to int: {language_info['confidence']}")
+                    confidence_value = language_info['confidence']
+                    # Handle both decimal (0.95) and percentage (95) formats
+                    if isinstance(confidence_value, float) and confidence_value <= 1.0:
+                        # Convert decimal to percentage (0.95 -> 95)
+                        language_info['confidence'] = int(confidence_value * 100)
+                    else:
+                        # Already a percentage, just convert to int
+                        language_info['confidence'] = int(confidence_value)
+                    print(f"  📊 Confidence converted to percentage: {language_info['confidence']}%")
                     
             except (KeyError, json.JSONDecodeError) as e:
                 # Fallback: assume English if parsing fails
