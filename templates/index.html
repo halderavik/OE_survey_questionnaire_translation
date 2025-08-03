@@ -1052,7 +1052,7 @@
                 } else {
                     // All batches completed
                     console.log('✅ All batches completed');
-                    showResults(response.results, response.total_questions);
+                    showResults(response);
                 }
             } else {
                 showError(response.error || 'Upload failed');
@@ -1138,7 +1138,21 @@
                     'Content-Type': 'application/json'
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    // Handle non-200 responses
+                    if (response.status === 400) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'No pending questions to process');
+                        });
+                    } else if (response.status === 503) {
+                        throw new Error('Service temporarily unavailable. Please try again.');
+                    } else {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                }
+                return response.json();
+            })
             .then(data => {
                 console.log('📊 Auto-continue batch response:', data);
                 if (data.success) {
@@ -1150,7 +1164,25 @@
             })
             .catch(error => {
                 console.error('❌ Auto-continue batch error:', error);
-                handleAutoContinueError();
+                
+                // Check if it's a "no pending questions" error
+                if (error.message.includes('No pending questions') || error.message.includes('All questions have been processed')) {
+                    console.log('✅ All questions already processed, showing final results');
+                    // This means all batches are complete, show the final results
+                    document.getElementById('progressText').textContent = 'All questions processed successfully!';
+                    document.getElementById('progressFill').style.width = '100%';
+                    
+                    // Show download and new file buttons
+                    document.getElementById('downloadBtn').style.display = 'inline-block';
+                    document.getElementById('newFileBtn').style.display = 'inline-block';
+                    
+                    // Hide progress after a delay
+                    setTimeout(() => {
+                        document.getElementById('progressContainer').style.display = 'none';
+                    }, 3000);
+                } else {
+                    handleAutoContinueError();
+                }
             });
         }
     </script>
