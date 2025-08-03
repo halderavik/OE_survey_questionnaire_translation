@@ -203,34 +203,133 @@ def auto_continue_batch():
         print(f"📊 Auto-continuing from question {current_batch_start + 1}")
         print(f"📊 Remaining questions: {total_questions - current_batch_start}")
         
-        # Create a temporary file path for the batch processing
-        dummy_filepath = "/tmp/auto_batch_continuation.xlsx"
-        
         # Process batches automatically until completion
-        all_results = []
         batch_count = 0
         
         while current_batch_start < total_questions:
             batch_count += 1
             print(f"\n🔄 Processing auto-batch {batch_count}")
             
+            # Calculate batch end
+            batch_size = 3  # Same as in process_excel_file_with_timeout
+            batch_end = min(current_batch_start + batch_size, total_questions)
+            
             # Process the current batch
-            result = process_excel_file_with_timeout(dummy_filepath)
+            batch_results = []
+            start_time = time.time()
             
-            if not result.get('success', False):
-                print(f"❌ Batch {batch_count} failed")
-                return jsonify(result)
+            for i, question in enumerate(app.pending_questions[current_batch_start:batch_end]):
+                # Check for Heroku timeout (25 seconds)
+                if time.time() - start_time > 25:
+                    print(f"⚠️ Heroku timeout approaching, stopping batch {batch_count}")
+                    # Mark remaining questions in this batch as pending
+                    for j in range(i, batch_end - current_batch_start):
+                        batch_results.append({
+                            'question_number': current_batch_start + j + 1,
+                            'row_number': current_batch_start + j + 1,
+                            'original_question': app.pending_questions[current_batch_start + j],
+                            'detected_language': 'Pending (timeout)',
+                            'confidence': 0,
+                            'english_translation': 'Processing stopped due to timeout'
+                        })
+                    break
+                
+                # Process the question
+                global_question_index = current_batch_start + i
+                row_number = global_question_index + 1
+                
+                # Update progress for current question
+                app.current_progress.update({
+                    'status': 'processing_question',
+                    'message': f'Processing question {global_question_index + 1}/{total_questions} (Row {row_number})',
+                    'current_question': global_question_index + 1,
+                    'current_row': row_number,
+                    'detected_language': 'Analyzing...',
+                    'confidence': 0,
+                    'translation': 'Waiting for language detection...',
+                    'processing_time': f'{global_question_index + 1}/{total_questions} questions processed',
+                    'api_response_time': 'Language detection in progress...'
+                })
+                
+                # Force a small delay to ensure progress is updated
+                time.sleep(0.1)
+                
+                print(f"\n--- Question {global_question_index + 1}/{total_questions} (Row {row_number}) ---")
+                print(f"📝 Original: {question[:100]}{'...' if len(question) > 100 else ''}")
+                
+                try:
+                    result = process_question(question, global_question_index + 1, row_number)
+                    batch_results.append(result)
+                    
+                    # Update progress with results
+                    app.current_progress.update({
+                        'detected_language': result['detected_language'],
+                        'confidence': result['confidence'],
+                        'translation': result['english_translation'][:100] + ('...' if len(result['english_translation']) > 100 else ''),
+                        'api_response_time': 'Translation completed'
+                    })
+                    
+                    # Force a small delay to ensure progress is updated
+                    time.sleep(0.1)
+                    
+                    print(f"✅ Question {global_question_index + 1} (Row {row_number}) processed successfully")
+                    print(f"   Language: {result['detected_language']}")
+                    print(f"   Confidence: {result['confidence']}%")
+                    print(f"   Translation: {result['english_translation'][:50]}{'...' if len(result['english_translation']) > 50 else ''}")
+                except Exception as e:
+                    print(f"❌ Error processing question {global_question_index + 1} (Row {row_number}): {str(e)}")
+                    # Add error result but continue processing
+                    batch_results.append({
+                        'question_number': global_question_index + 1,
+                        'row_number': row_number,
+                        'original_question': question,
+                        'detected_language': 'Error',
+                        'confidence': 0,
+                        'english_translation': f'Processing error: {str(e)}'
+                    })
+                    
+                    # Update progress with error
+                    app.current_progress.update({
+                        'detected_language': 'Error',
+                        'confidence': 0,
+                        'translation': f'Processing error: {str(e)}',
+                        'api_response_time': 'Error occurred'
+                    })
             
-            # Add batch results
-            all_results.extend(result.get('results', []))
+            # Add batch results to processed results
+            app.processed_results.extend(batch_results)
             
-            # Check if all batches are complete
-            if result.get('batch_complete', False):
+            # Update batch start for next batch
+            app.current_batch_start = batch_end
+            
+            # Check if all questions are processed
+            if batch_end >= total_questions:
+                # All questions processed
+                processed_count = len([r for r in app.processed_results if r['detected_language'] not in ['Error', 'Pending (timeout)']])
+                pending_count = len([r for r in app.processed_results if r['detected_language'] == 'Pending (timeout)'])
+                
+                completion_message = f'Processing completed! {processed_count}/{total_questions} questions processed'
+                if pending_count > 0:
+                    completion_message += f' ({pending_count} pending due to timeout)'
+                
+                app.current_progress.update({
+                    'status': 'completed',
+                    'message': completion_message,
+                    'current_question': total_questions,
+                    'detected_language': 'Multiple languages detected',
+                    'confidence': 0,
+                    'translation': f'{processed_count}/{total_questions} questions translated to English',
+                    'processing_time': f'Total: {processed_count} questions processed',
+                    'api_response_time': 'Processing completed'
+                })
+                
+                # Clear session data
+                delattr(app, 'pending_questions')
+                delattr(app, 'processed_results')
+                delattr(app, 'current_batch_start')
+                
                 print(f"✅ All batches completed after {batch_count} iterations")
                 break
-            
-            # Update current_batch_start for next iteration
-            current_batch_start = app.current_batch_start
             
             # Small delay between batches to prevent overwhelming the system
             time.sleep(0.5)
@@ -238,7 +337,7 @@ def auto_continue_batch():
         # Return final results
         final_result = {
             'success': True,
-            'results': all_results,
+            'results': app.processed_results,
             'total_questions': total_questions,
             'processed_at': datetime.now().isoformat(),
             'batch_complete': True,
