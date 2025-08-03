@@ -721,25 +721,32 @@
                 window.progressEventSource.close();
             }
             
+            console.log('🔄 Starting SSE connection to /progress...');
+            
             // Create new EventSource for real-time updates
             window.progressEventSource = new EventSource('/progress');
             
-            // Set a timeout for the connection (20 seconds)
+            // Set a shorter timeout for the connection (15 seconds to be safe)
             window.progressTimeout = setTimeout(() => {
                 console.log('⏰ SSE connection timeout, reconnecting...');
                 if (window.progressEventSource) {
                     window.progressEventSource.close();
                 }
                 startProgressMonitoring();
-            }, 20000);
+            }, 15000);
+            
+            window.progressEventSource.onopen = function(event) {
+                console.log('✅ SSE connection opened');
+            };
             
             window.progressEventSource.onmessage = function(event) {
                 try {
+                    console.log('📨 SSE message received:', event.data);
                     const progressData = JSON.parse(event.data);
                     
                     // Handle timeout message from server
                     if (progressData.status === 'timeout') {
-                        console.log('🔄 SSE connection timeout, reconnecting...');
+                        console.log('🔄 Server timeout, reconnecting...');
                         setTimeout(() => {
                             if (window.progressEventSource) {
                                 window.progressEventSource.close();
@@ -751,12 +758,14 @@
                     
                     updateProgressFromBackend(progressData);
                 } catch (error) {
-                    console.error('Error parsing progress data:', error);
+                    console.error('❌ Error parsing progress data:', error);
+                    console.error('Raw data:', event.data);
                 }
             };
             
             window.progressEventSource.onerror = function(error) {
-                console.error('EventSource error:', error);
+                console.error('❌ EventSource error:', error);
+                console.log('🔄 Reconnecting after error...');
                 // Reconnect after a short delay
                 setTimeout(() => {
                     if (window.progressEventSource) {
@@ -802,7 +811,18 @@
                 if (window.progressEventSource) {
                     window.progressEventSource.close();
                 }
+                // Start polling for final results after a short delay
+                setTimeout(() => {
+                    pollForResults();
+                }, 2000);
             }
+        }
+        
+        // Fallback polling mechanism
+        function pollForResults() {
+            console.log('🔄 Polling for final results...');
+            // This will be called if SSE doesn't work properly
+            // The upload request should complete and return results
         }
 
         function hideProgress() {

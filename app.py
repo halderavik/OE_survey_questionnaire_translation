@@ -70,8 +70,8 @@ def progress_stream():
         last_progress = None
         
         while True:
-            # Check for timeout (25 seconds to be safe)
-            if time.time() - start_time > 25:
+            # Check for timeout (20 seconds to be safe)
+            if time.time() - start_time > 20:
                 # Send a keepalive message and break
                 yield f"data: {json.dumps({'status': 'timeout', 'message': 'Connection timeout - please reconnect'})}\n\n"
                 break
@@ -90,10 +90,10 @@ def progress_stream():
                 if 'confidence' in progress_data:
                     progress_data['confidence'] = int(progress_data['confidence'])
                 
-                # Only send if data has changed or it's been more than 2 seconds
+                # Only send if data has changed or it's been more than 1 second
                 current_time = time.time()
                 if (last_progress != progress_data or 
-                    current_time - start_time > 2):
+                    current_time - start_time > 1):
                     yield f"data: {json.dumps(progress_data)}\n\n"
                     last_progress = progress_data.copy()
                     
@@ -101,7 +101,7 @@ def progress_stream():
                     if progress_data.get('status') in ['completed', 'error']:
                         break
             
-            time.sleep(0.5)  # Update every 500ms
+            time.sleep(0.3)  # Update every 300ms for more responsive updates
     
     return app.response_class(
         generate(),
@@ -113,6 +113,37 @@ def progress_stream():
             'X-Accel-Buffering': 'no'  # Disable nginx buffering
         }
     )
+
+@app.route('/progress-simple', methods=['GET'])
+def progress_simple():
+    """Simple progress endpoint for polling (fallback when SSE fails)."""
+    if hasattr(app, 'current_progress'):
+        progress_data = app.current_progress.copy()
+        
+        # Convert numpy types to standard Python types for JSON serialization
+        if 'current_question' in progress_data:
+            progress_data['current_question'] = int(progress_data['current_question'])
+        if 'total_questions' in progress_data:
+            progress_data['total_questions'] = int(progress_data['total_questions'])
+        if 'current_row' in progress_data:
+            progress_data['current_row'] = int(progress_data['current_row'])
+        if 'confidence' in progress_data:
+            progress_data['confidence'] = int(progress_data['confidence'])
+        
+        return jsonify(progress_data)
+    else:
+        return jsonify({
+            'status': 'waiting',
+            'message': 'No processing in progress',
+            'current_question': 0,
+            'total_questions': 0,
+            'current_row': 0,
+            'detected_language': '',
+            'confidence': 0,
+            'translation': '',
+            'processing_time': '',
+            'api_response_time': ''
+        })
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
