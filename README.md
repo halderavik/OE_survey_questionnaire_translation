@@ -1,21 +1,25 @@
 # Survey Question Translator MVP
 
-A professional web application built with Flask that enables researchers and survey professionals to translate survey questions from multiple languages into English using DeepSeek AI.
+A professional web application built with Flask that enables researchers and survey professionals to translate survey questions from multiple languages into English using DeepSeek AI. Features real-time progress tracking and live processing analysis.
 
 ## Features
 
 - **Simple File Upload**: Drag-and-drop Excel file upload (.xlsx, .xls)
-- **AI-Powered Processing**: Automatic language detection and translation
+- **AI-Powered Processing**: Automatic language detection and translation using DeepSeek AI
+- **Real-Time Progress Tracking**: Live updates showing current question processing status
+- **Live Processing Analysis**: Real-time display of language detection, confidence scores, and translation progress
 - **Professional Results**: Clean, organized results with confidence scoring
 - **Excel Export**: One-click download of formatted results
 - **Responsive Design**: Works on desktop and tablet devices
+- **Comprehensive Error Handling**: Graceful handling of API errors and processing failures
 
 ## Technology Stack
 
 - **Backend**: Flask 2.3+
 - **File Processing**: pandas, openpyxl, xlrd
 - **AI Integration**: DeepSeek API
-- **Frontend**: HTML5, CSS3, JavaScript
+- **Real-Time Updates**: Server-Sent Events (SSE)
+- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
 - **Deployment**: Gunicorn
 
 ## Installation
@@ -71,6 +75,13 @@ A professional web application built with Flask that enables researchers and sur
    SECRET_KEY=your_secret_key_here
    FLASK_ENV=development
    FLASK_DEBUG=True
+   
+   # Application Configuration
+   MAX_FILE_SIZE=2097152  # 2MB in bytes
+   MAX_QUESTIONS=1000
+   
+   # Test Mode (set to true to bypass API calls for testing)
+   TEST_MODE=false
    ```
 
 6. **Run the application**
@@ -91,11 +102,16 @@ A professional web application built with Flask that enables researchers and sur
 4. Preview the first 5 questions for confirmation
 5. Click "Process Questions" to continue
 
-### Step 2: AI Processing
-1. The system automatically detects the language of each question
-2. Calculates confidence scores for language detection
-3. Translates all questions to English
-4. Real-time progress bar shows processing status
+### Step 2: Real-Time AI Processing
+1. **Live Progress Bar**: Shows overall processing progress
+2. **Real-Time Analysis Window**: Displays current processing details:
+   - Current question number and row being processed
+   - Detected language and confidence score
+   - Translation progress and API response times
+   - Processing time for each question
+3. **Automatic Language Detection**: AI detects the language of each question
+4. **Confidence Scoring**: Calculates confidence scores for language detection
+5. **English Translation**: Translates all questions to English
 
 ### Step 3: View Results & Download
 1. Results are displayed in a professional table format
@@ -129,11 +145,37 @@ Upload and process Excel file with survey questions.
 **Request**: Multipart form data with Excel file
 **Response**: JSON with processing results
 
+### GET /progress
+Stream real-time progress updates using Server-Sent Events (SSE).
+
+**Response**: Event stream with JSON progress data
+
 ### POST /download
 Generate and download Excel file with results.
 
 **Request**: JSON with results data
 **Response**: Excel file download
+
+### GET /test
+Health check endpoint to verify application status.
+
+**Response**: JSON with application status
+
+## Real-Time Progress System
+
+The application features a sophisticated real-time progress tracking system:
+
+### Frontend Features
+- **Live Progress Bar**: Updates in real-time showing processing percentage
+- **Analysis Window**: Displays current question details, language detection, and translation status
+- **Status Indicators**: Color-coded status updates (uploading, processing, completed, error)
+- **Timeout Handling**: Automatic timeout warnings for long-running processes
+
+### Backend Features
+- **Server-Sent Events (SSE)**: Real-time data streaming from backend to frontend
+- **Global Progress State**: Centralized progress tracking across all processing stages
+- **Detailed Logging**: Comprehensive terminal output for debugging and monitoring
+- **Error Recovery**: Graceful handling of individual question failures
 
 ## Error Handling
 
@@ -141,9 +183,11 @@ The application includes comprehensive error handling for:
 - Invalid file types
 - File size limits
 - Empty files
-- API errors
+- API errors and timeouts
 - Network issues
 - Processing failures
+- JSON parsing errors
+- Memory management
 
 ## Security & Privacy
 
@@ -152,11 +196,14 @@ The application includes comprehensive error handling for:
 - **Secure Transit**: HTTPS encryption for all communications
 - **API Security**: Secure DeepSeek API key management
 - **Privacy**: No user tracking or data collection
+- **Input Validation**: Comprehensive file and data validation
 
 ## Performance
 
 - **Processing Speed**: ~50 questions per minute
 - **Response Time**: Results within 60 seconds for 100 questions
+- **Real-Time Updates**: 500ms refresh rate for progress updates
+- **API Timeouts**: 15-second timeout per API call for responsive feedback
 - **File Size**: Maximum 2MB Excel files
 - **Question Limit**: Up to 1000 questions per file
 
@@ -165,13 +212,13 @@ The application includes comprehensive error handling for:
 ### Project Structure
 ```
 OE_survey_questionnaire_translation/
-├── app.py                 # Main Flask application
+├── app.py                 # Main Flask application with SSE support
 ├── requirements.txt       # Python dependencies
 ├── .env.example          # Example environment variables
 ├── .gitignore           # Git ignore rules
 ├── README.md            # Project documentation
 ├── templates/
-│   └── index.html       # Main application template
+│   └── index.html       # Main application template with real-time UI
 ├── planning.md          # Technical planning document
 ├── prd.md              # Product requirements document
 ├── task.md             # Development tasks
@@ -194,6 +241,12 @@ pytest
 - Include docstrings for all functions
 - Format with black
 
+### Development Features
+- **Debug Mode**: Detailed logging and error messages
+- **Test Mode**: Bypass API calls for development testing
+- **Hot Reload**: Automatic server restart on code changes
+- **Comprehensive Logging**: Detailed terminal output for debugging
+
 ## Deployment
 
 ### Production Deployment with Gunicorn
@@ -211,6 +264,9 @@ FLASK_ENV=production
 FLASK_DEBUG=False
 SECRET_KEY=your_secure_secret_key
 DEEPSEEK_API_KEY=your_deepseek_api_key
+MAX_FILE_SIZE=2097152
+MAX_QUESTIONS=1000
+TEST_MODE=false
 ```
 
 ## Troubleshooting
@@ -221,9 +277,16 @@ DEEPSEEK_API_KEY=your_deepseek_api_key
 2. **API Error**: Verify DeepSeek API key in .env file
 3. **File Upload Error**: Check file format and size limits
 4. **Memory Error**: Reduce number of questions in file
+5. **Progress Not Updating**: Check browser console for SSE connection errors
+6. **JSON Serialization Error**: Ensure all numeric values are standard Python types
 
 ### Logs
-Check console output for detailed error messages and debugging information.
+Check console output for detailed error messages and debugging information. The application provides comprehensive logging for:
+- File upload and validation
+- Excel file processing
+- API calls and responses
+- Progress tracking
+- Error handling
 
 ## Contributing
 
@@ -242,6 +305,14 @@ This project is licensed under the MIT License.
 For support and questions, please refer to the project documentation or create an issue in the repository.
 
 ## Changelog
+
+### Version 1.1.0 (Current)
+- **Real-Time Progress Tracking**: Added Server-Sent Events (SSE) for live progress updates
+- **Live Processing Analysis**: Real-time display of current question processing details
+- **Enhanced Error Handling**: Improved error recovery and user feedback
+- **Performance Optimizations**: Reduced API timeouts and improved response times
+- **Comprehensive Logging**: Detailed backend logging for debugging and monitoring
+- **JSON Serialization Fixes**: Resolved numpy type serialization issues
 
 ### Version 1.0.0 (MVP)
 - Initial release with core functionality

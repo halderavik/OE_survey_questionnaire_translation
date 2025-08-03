@@ -7,6 +7,7 @@ and translating them using DeepSeek AI.
 """
 
 import os
+import time
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import pandas as pd
@@ -52,68 +53,236 @@ def index():
     """Render the main application page."""
     return render_template('index.html')
 
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Test endpoint to check if Flask is running."""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Flask app is running',
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/progress', methods=['GET'])
+def progress_stream():
+    """Stream real-time progress updates."""
+    def generate():
+        while True:
+            # Get the latest progress from global state
+            if hasattr(app, 'current_progress'):
+                progress_data = app.current_progress.copy()
+                
+                # Convert numpy types to standard Python types for JSON serialization
+                if 'current_question' in progress_data:
+                    progress_data['current_question'] = int(progress_data['current_question'])
+                if 'total_questions' in progress_data:
+                    progress_data['total_questions'] = int(progress_data['total_questions'])
+                if 'current_row' in progress_data:
+                    progress_data['current_row'] = int(progress_data['current_row'])
+                if 'confidence' in progress_data:
+                    progress_data['confidence'] = int(progress_data['confidence'])
+                
+                yield f"data: {json.dumps(progress_data)}\n\n"
+            time.sleep(0.5)  # Update every 500ms
+    
+    return app.response_class(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*'
+        }
+    )
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     """Handle file upload and process survey questions."""
+    print("\n" + "="*60)
+    print("🚀 UPLOAD REQUEST RECEIVED")
+    print("="*60)
+    
     try:
         # Check if file was uploaded
         if 'file' not in request.files:
+            print("❌ No file in request.files")
             return jsonify({'error': 'No file uploaded'}), 400
         
         file = request.files['file']
+        print(f"✅ File received: {file.filename}")
+        print(f"✅ File size: {len(file.read())} bytes")
+        file.seek(0)  # Reset file pointer
         
         # Check if file was selected
         if file.filename == '':
+            print("❌ No file selected")
             return jsonify({'error': 'No file selected'}), 400
         
         # Validate file type
         if not allowed_file(file.filename):
+            print(f"❌ Invalid file type: {file.filename}")
             return jsonify({'error': 'Invalid file type. Please upload an Excel file (.xlsx or .xls)'}), 400
+        
+        print(f"✅ File type validated: {file.filename}")
         
         # Save file temporarily
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
+        print(f"✅ File saved to: {filepath}")
         
         try:
             # Process the file
+            print("🔄 Starting file processing...")
             result = process_excel_file(filepath)
+            print("✅ File processing completed successfully")
             return jsonify(result)
         except Exception as e:
-            print(f"Error processing file {filename}: {str(e)}")
+            print(f"❌ Error processing file {filename}: {str(e)}")
             return jsonify({'error': f'File processing error: {str(e)}'}), 500
         finally:
             # Clean up temporary file
             try:
                 if os.path.exists(filepath):
                     os.remove(filepath)
+                    print(f"✅ Temporary file cleaned up: {filepath}")
             except Exception as e:
-                print(f"Error cleaning up file {filepath}: {str(e)}")
+                print(f"⚠️ Error cleaning up file {filepath}: {str(e)}")
         
     except Exception as e:
-        print(f"Error in upload_file: {str(e)}")
+        print(f"❌ Error in upload_file: {str(e)}")
         return jsonify({'error': f'Upload error: {str(e)}'}), 500
 
 def process_excel_file(filepath):
     """Process Excel file and return translation results."""
+    print("\n" + "="*50)
+    print("📊 EXCEL FILE PROCESSING")
+    print("="*50)
+    
     try:
+        # Initialize progress tracking
+        app.current_progress = {
+            'status': 'reading_file',
+            'message': 'Reading Excel file...',
+            'current_question': 0,
+            'total_questions': 0,
+            'current_row': 0,
+            'detected_language': '',
+            'confidence': 0,
+            'translation': '',
+            'processing_time': '',
+            'api_response_time': ''
+        }
+        
         # Read Excel file
+        print(f"📖 Reading Excel file: {filepath}")
         df = pd.read_excel(filepath, header=None)
+        print(f"✅ Excel file read successfully")
+        print(f"📊 DataFrame shape: {df.shape}")
         
         # Extract questions from first column
         questions = df.iloc[:, 0].dropna().tolist()
+        print(f"📝 Extracted {len(questions)} questions from first column")
         
         if not questions:
+            print("❌ No questions found in Excel file")
             raise ValueError("No questions found in the Excel file")
         
         if len(questions) > app.config['MAX_QUESTIONS']:
+            print(f"❌ Too many questions: {len(questions)} > {app.config['MAX_QUESTIONS']}")
             raise ValueError(f"Maximum {app.config['MAX_QUESTIONS']} questions allowed per file")
+        
+        print(f"✅ Question count validated: {len(questions)} questions")
+        
+        # Update progress for processing start
+        app.current_progress.update({
+            'status': 'processing',
+            'message': f'Starting API processing for {len(questions)} questions...',
+            'total_questions': len(questions)
+        })
         
         # Process questions with DeepSeek API
         results = []
+        total_questions = len(questions)
+        
+        print(f"\n🔄 Starting API processing for {total_questions} questions...")
+        print("="*50)
+        
         for i, question in enumerate(questions):
-            result = process_question(question, i + 1)
-            results.append(result)
+            # Find the actual row number in the Excel file
+            row_number = df[df.iloc[:, 0] == question].index[0] + 1 if len(df[df.iloc[:, 0] == question]) > 0 else i + 1
+            # Convert to standard Python int to avoid JSON serialization issues
+            row_number = int(row_number)
+            
+            # Update progress for current question
+            app.current_progress.update({
+                'status': 'processing_question',
+                'message': f'Processing question {i+1}/{total_questions} (Row {row_number})',
+                'current_question': i + 1,
+                'current_row': row_number,
+                'detected_language': 'Analyzing...',
+                'confidence': 0,
+                'translation': 'Waiting for language detection...',
+                'processing_time': f'{i+1}/{total_questions} questions processed',
+                'api_response_time': 'Language detection in progress...'
+            })
+            
+            print(f"\n--- Question {i+1}/{total_questions} (Row {row_number}) ---")
+            print(f"📝 Original: {question[:100]}{'...' if len(question) > 100 else ''}")
+            
+            try:
+                result = process_question(question, i + 1, row_number)
+                results.append(result)
+                
+                # Update progress with results
+                app.current_progress.update({
+                    'detected_language': result['detected_language'],
+                    'confidence': result['confidence'],
+                    'translation': result['english_translation'][:100] + ('...' if len(result['english_translation']) > 100 else ''),
+                    'api_response_time': 'Translation completed'
+                })
+                
+                print(f"✅ Question {i+1} (Row {row_number}) processed successfully")
+                print(f"   Language: {result['detected_language']}")
+                print(f"   Confidence: {result['confidence']}%")
+                print(f"   Translation: {result['english_translation'][:50]}{'...' if len(result['english_translation']) > 50 else ''}")
+            except Exception as e:
+                print(f"❌ Error processing question {i+1} (Row {row_number}): {str(e)}")
+                # Add error result but continue processing
+                results.append({
+                    'question_number': i + 1,
+                    'row_number': row_number,
+                    'original_question': question,
+                    'detected_language': 'Error',
+                    'confidence': 0,
+                    'english_translation': f'Processing error: {str(e)}'
+                })
+                
+                # Update progress with error
+                app.current_progress.update({
+                    'detected_language': 'Error',
+                    'confidence': 0,
+                    'translation': f'Processing error: {str(e)}',
+                    'api_response_time': 'Error occurred'
+                })
+        
+        # Update progress for completion
+        app.current_progress.update({
+            'status': 'completed',
+            'message': 'Processing completed successfully!',
+            'current_question': total_questions,
+            'detected_language': 'Multiple languages detected',
+            'confidence': 0,
+            'translation': 'All questions translated to English',
+            'processing_time': f'Total: {total_questions} questions processed',
+            'api_response_time': 'All translations completed'
+        })
+        
+        print("\n" + "="*50)
+        print("✅ ALL QUESTIONS PROCESSED")
+        print(f"📊 Total processed: {len(results)}")
+        print(f"📊 Successful: {len([r for r in results if r['detected_language'] != 'Error'])}")
+        print(f"📊 Errors: {len([r for r in results if r['detected_language'] == 'Error'])}")
+        print("="*50)
         
         return {
             'success': True,
@@ -123,13 +292,27 @@ def process_excel_file(filepath):
         }
         
     except Exception as e:
+        print(f"❌ Excel processing error: {str(e)}")
+        # Update progress with error
+        app.current_progress.update({
+            'status': 'error',
+            'message': f'Error: {str(e)}',
+            'detected_language': 'Error',
+            'confidence': 0,
+            'translation': f'Processing failed: {str(e)}',
+            'api_response_time': 'Error occurred'
+        })
         raise Exception(f"Error processing Excel file: {str(e)}")
 
-def process_question(question, question_number):
+def process_question(question, question_number, row_number=None):
     """Process a single question using DeepSeek API."""
+    row_info = f" (Row {row_number})" if row_number else ""
+    print(f"  🔍 Processing question {question_number}{row_info}...")
+    
     try:
         # Test mode - return mock results
         if app.config.get('TEST_MODE', False):
+            print(f"  🧪 TEST MODE: Returning mock results")
             return {
                 'question_number': question_number,
                 'original_question': question,
@@ -140,7 +323,10 @@ def process_question(question, question_number):
         
         # Check if API key is configured
         if not app.config.get('DEEPSEEK_API_KEY'):
+            print(f"  ❌ DeepSeek API key not configured")
             raise Exception("DeepSeek API key not configured")
+        
+        print(f"  ✅ API key configured: {app.config['DEEPSEEK_API_KEY'][:10]}...")
         
         # Prepare API request for language detection and translation
         headers = {
@@ -150,13 +336,11 @@ def process_question(question, question_number):
         
         # First, detect language
         language_prompt = f"""
-        Analyze the following text and provide:
-        1. The detected language (language name in English)
-        2. A confidence score (0-100)
+        Analyze the following text and provide the detected language and confidence score.
         
         Text: "{question}"
         
-        Respond in JSON format:
+        Respond with ONLY a valid JSON object in this exact format (no markdown, no code blocks):
         {{
             "language": "detected_language_name",
             "confidence": confidence_score
@@ -170,25 +354,65 @@ def process_question(question, question_number):
         }
         
         try:
+            print(f"  🌐 Making language detection API call...")
+            print(f"  📡 URL: {app.config['DEEPSEEK_API_URL']}")
+            print(f"  ⏱️  Timeout: 15 seconds")
+            
+            # Update progress for language detection
+            if hasattr(app, 'current_progress'):
+                app.current_progress.update({
+                    'detected_language': 'Detecting language...',
+                    'api_response_time': 'Language detection API call in progress...'
+                })
+            
+            start_time = datetime.now()
             language_response = requests.post(
                 app.config['DEEPSEEK_API_URL'],
                 headers=headers,
                 json=language_data,
-                timeout=30
+                timeout=15  # Reduced timeout for faster feedback
             )
+            end_time = datetime.now()
+            api_time = (end_time - start_time).total_seconds()
+            
+            print(f"  ⏱️  API call completed in {api_time:.2f} seconds")
+            print(f"  📊 Response status: {language_response.status_code}")
             
             if language_response.status_code != 200:
+                print(f"  ❌ API Error: {language_response.status_code} - {language_response.text}")
                 raise Exception(f"Language detection API error: {language_response.status_code} - {language_response.text}")
             
+            print(f"  ✅ API call successful")
             language_result = language_response.json()
             
             # Handle potential JSON parsing issues in API response
             try:
+                print(f"  🔍 Parsing language detection response...")
                 language_content = language_result['choices'][0]['message']['content']
+                print(f"  📝 Raw API response: {language_content}")
+                
+                # Clean up the response - remove markdown code blocks if present
+                if language_content.startswith('```json'):
+                    language_content = language_content.replace('```json', '').replace('```', '').strip()
+                    print(f"  🧹 Cleaned JSON response: {language_content}")
+                elif language_content.startswith('```'):
+                    language_content = language_content.replace('```', '').strip()
+                    print(f"  🧹 Cleaned response: {language_content}")
+                
                 language_info = json.loads(language_content)
+                print(f"  ✅ JSON parsed successfully: {language_info}")
+                
+                # Ensure confidence is an integer
+                if 'confidence' in language_info:
+                    language_info['confidence'] = int(language_info['confidence'])
+                    print(f"  📊 Confidence converted to int: {language_info['confidence']}")
+                    
             except (KeyError, json.JSONDecodeError) as e:
                 # Fallback: assume English if parsing fails
+                print(f"  ❌ JSON parsing error: {e}")
+                print(f"  📝 Raw content: {language_content}")
                 language_info = {"language": "English", "confidence": 90}
+                print(f"  🔄 Using fallback: {language_info}")
                 
         except requests.exceptions.RequestException as e:
             raise Exception(f"Network error during language detection: {str(e)}")
@@ -197,6 +421,7 @@ def process_question(question, question_number):
         translation_prompt = f"""
         Translate the following text to English. Maintain the original meaning and tone.
         If the text is already in English, return it unchanged.
+        Preserve any HTML tags like <i>, <em>, <strong>, etc.
         
         Text: "{question}"
         
@@ -210,23 +435,42 @@ def process_question(question, question_number):
         }
         
         try:
+            print(f"  🌐 Making translation API call...")
+            print(f"  ⏱️  Timeout: 15 seconds")
+            
+            # Update progress for translation
+            if hasattr(app, 'current_progress'):
+                app.current_progress.update({
+                    'translation': 'Translating to English...',
+                    'api_response_time': 'Translation API call in progress...'
+                })
+            
+            start_time = datetime.now()
             translation_response = requests.post(
                 app.config['DEEPSEEK_API_URL'],
                 headers=headers,
                 json=translation_data,
-                timeout=30
+                timeout=15  # Reduced timeout for faster feedback
             )
+            end_time = datetime.now()
+            api_time = (end_time - start_time).total_seconds()
+            
+            print(f"  ⏱️  Translation API call completed in {api_time:.2f} seconds")
+            print(f"  📊 Response status: {translation_response.status_code}")
             
             if translation_response.status_code != 200:
+                print(f"  ❌ Translation API Error: {translation_response.status_code} - {translation_response.text}")
                 raise Exception(f"Translation API error: {translation_response.status_code} - {translation_response.text}")
             
+            print(f"  ✅ Translation API call successful")
             translation_result = translation_response.json()
             english_translation = translation_result['choices'][0]['message']['content'].strip()
+            print(f"  📝 Translation result: {english_translation[:50]}{'...' if len(english_translation) > 50 else ''}")
             
         except requests.exceptions.RequestException as e:
             raise Exception(f"Network error during translation: {str(e)}")
         
-        return {
+        result = {
             'question_number': question_number,
             'original_question': question,
             'detected_language': language_info.get('language', 'Unknown'),
@@ -234,15 +478,26 @@ def process_question(question, question_number):
             'english_translation': english_translation
         }
         
+        if row_number:
+            result['row_number'] = row_number
+            
+        return result
+        
     except Exception as e:
-        print(f"Error processing question {question_number}: {str(e)}")
-        return {
+        row_info = f" (Row {row_number})" if row_number else ""
+        print(f"Error processing question {question_number}{row_info}: {str(e)}")
+        result = {
             'question_number': question_number,
             'original_question': question,
             'detected_language': 'Error',
             'confidence': 0,
             'english_translation': f'Translation error: {str(e)}'
         }
+        
+        if row_number:
+            result['row_number'] = row_number
+            
+        return result
 
 @app.route('/download', methods=['POST'])
 def download_results():

@@ -157,6 +157,88 @@
             color: #666;
         }
 
+        .analysis-window {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            margin-top: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .analysis-header h3 {
+            margin: 0;
+            color: #495057;
+            font-size: 1.2rem;
+        }
+
+        .analysis-status {
+            background: #007bff;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .analysis-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .analysis-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .analysis-item strong {
+            color: #495057;
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .analysis-item span {
+            color: #212529;
+            font-size: 0.95rem;
+            word-break: break-word;
+        }
+
+        .analysis-item:nth-child(1) {
+            grid-column: 1 / -1;
+            border-left-color: #28a745;
+        }
+
+        .analysis-item:nth-child(4) {
+            grid-column: 1 / -1;
+            border-left-color: #ffc107;
+        }
+
+        @media (max-width: 768px) {
+            .analysis-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .analysis-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+
         .results-section {
             display: none;
         }
@@ -346,6 +428,34 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <div class="progress-text" id="progressText">Processing questions...</div>
+                
+                <!-- Real-time Analysis Window -->
+                <div class="analysis-window" id="analysisWindow">
+                    <div class="analysis-header">
+                        <h3>🔄 Live Processing Analysis</h3>
+                        <div class="analysis-status" id="analysisStatus">Waiting for processing to start...</div>
+                    </div>
+                    <div class="analysis-content" id="analysisContent">
+                        <div class="analysis-item">
+                            <strong>Current Question:</strong> <span id="currentQuestion">-</span>
+                        </div>
+                        <div class="analysis-item">
+                            <strong>Detected Language:</strong> <span id="detectedLanguage">-</span>
+                        </div>
+                        <div class="analysis-item">
+                            <strong>Confidence Score:</strong> <span id="confidenceScore">-</span>
+                        </div>
+                        <div class="analysis-item">
+                            <strong>Translation:</strong> <span id="translationText">-</span>
+                        </div>
+                        <div class="analysis-item">
+                            <strong>Processing Time:</strong> <span id="processingTime">-</span>
+                        </div>
+                        <div class="analysis-item">
+                            <strong>API Response Time:</strong> <span id="apiResponseTime">-</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="results-section" id="resultsSection">
@@ -498,25 +608,53 @@
             const formData = new FormData();
             formData.append('file', window.selectedFile);
 
+            console.log('🚀 Starting file upload...');
+            console.log('📁 File name:', window.selectedFile.name);
+            console.log('📊 File size:', window.selectedFile.size, 'bytes');
+            console.log('📋 FormData entries:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`  ${key}:`, value);
+            }
+
             showProgress();
             processBtn.disabled = true;
 
             try {
+                console.log('🌐 Making POST request to /upload...');
+                const startTime = Date.now();
+                
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
 
-                const result = await response.json();
+                const endTime = Date.now();
+                console.log(`⏱️ Request completed in ${endTime - startTime}ms`);
+                console.log('📊 Response status:', response.status);
+                console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
 
-                if (response.ok) {
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    console.error('❌ Upload failed:', errorResult.error);
+                    showError(errorResult.error || 'Upload failed');
+                    return;
+                }
+
+                const result = await response.json();
+                console.log('📄 Response data:', result);
+
+                if (result.success) {
+                    console.log('✅ Upload successful, showing results');
                     showResults(result);
                 } else {
-                    showError(result.error || 'Upload failed');
+                    console.error('❌ Processing failed:', result.error);
+                    showError(result.error || 'Processing failed');
                 }
             } catch (error) {
+                console.error('❌ Upload error:', error);
                 showError('Network error: ' + error.message);
             } finally {
+                console.log('🏁 Upload process completed');
                 hideProgress();
                 processBtn.disabled = false;
             }
@@ -562,15 +700,81 @@
             document.getElementById('progressFill').style.width = '0%';
             document.getElementById('progressText').textContent = 'Processing questions...';
             
-            // Simulate progress
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 15;
-                if (progress > 90) progress = 90;
-                document.getElementById('progressFill').style.width = progress + '%';
-            }, 500);
+            // Show analysis window
+            document.getElementById('analysisWindow').style.display = 'block';
+            updateAnalysisStatus('Starting file upload...', 'uploading');
             
-            window.progressInterval = interval;
+            // Start real-time progress monitoring
+            startProgressMonitoring();
+            
+            // Set a timeout to prevent infinite waiting
+            window.progressTimeout = setTimeout(() => {
+                console.warn('Processing timeout - taking longer than expected');
+                document.getElementById('progressText').textContent = 'Processing taking longer than expected...';
+                updateAnalysisStatus('Processing taking longer than expected...', 'timeout');
+            }, 30000); // 30 seconds timeout
+        }
+
+        function startProgressMonitoring() {
+            // Close existing EventSource if any
+            if (window.progressEventSource) {
+                window.progressEventSource.close();
+            }
+            
+            // Create new EventSource for real-time updates
+            window.progressEventSource = new EventSource('/progress');
+            
+            window.progressEventSource.onmessage = function(event) {
+                try {
+                    const progressData = JSON.parse(event.data);
+                    updateProgressFromBackend(progressData);
+                } catch (error) {
+                    console.error('Error parsing progress data:', error);
+                }
+            };
+            
+            window.progressEventSource.onerror = function(error) {
+                console.error('EventSource error:', error);
+                // Don't close the connection on error, let it reconnect
+            };
+        }
+
+        function updateProgressFromBackend(progressData) {
+            console.log('📊 Real-time progress update:', progressData);
+            
+            // Update progress bar
+            if (progressData.total_questions > 0) {
+                const progressPercent = (progressData.current_question / progressData.total_questions) * 100;
+                document.getElementById('progressFill').style.width = Math.min(progressPercent, 95) + '%';
+            }
+            
+            // Update progress text
+            document.getElementById('progressText').textContent = progressData.message;
+            
+            // Update analysis window
+            updateAnalysisStatus(progressData.message, progressData.status);
+            
+            // Update analysis content
+            document.getElementById('currentQuestion').textContent = 
+                progressData.current_question > 0 ? 
+                `Question ${progressData.current_question}/${progressData.total_questions} (Row ${progressData.current_row})` : 
+                progressData.message;
+            
+            document.getElementById('detectedLanguage').textContent = progressData.detected_language || '-';
+            document.getElementById('confidenceScore').textContent = 
+                progressData.confidence > 0 ? `${progressData.confidence}%` : '-';
+            document.getElementById('translationText').textContent = progressData.translation || '-';
+            document.getElementById('processingTime').textContent = progressData.processing_time || '-';
+            document.getElementById('apiResponseTime').textContent = progressData.api_response_time || '-';
+            
+            // Handle completion
+            if (progressData.status === 'completed') {
+                document.getElementById('progressFill').style.width = '100%';
+                document.getElementById('progressText').textContent = 'Complete!';
+                if (window.progressEventSource) {
+                    window.progressEventSource.close();
+                }
+            }
         }
 
         function hideProgress() {
@@ -578,7 +782,52 @@
             if (window.progressInterval) {
                 clearInterval(window.progressInterval);
             }
+            if (window.progressTimeout) {
+                clearTimeout(window.progressTimeout);
+            }
+            if (window.progressEventSource) {
+                window.progressEventSource.close();
+            }
+            // Complete the progress bar
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = 'Complete!';
         }
+
+        function updateAnalysisStatus(message, status) {
+            const statusElement = document.getElementById('analysisStatus');
+            statusElement.textContent = message;
+            
+            // Update status color based on status
+            statusElement.className = 'analysis-status';
+            switch(status) {
+                case 'uploading':
+                    statusElement.style.background = '#007bff';
+                    break;
+                case 'reading_file':
+                    statusElement.style.background = '#17a2b8';
+                    break;
+                case 'processing':
+                    statusElement.style.background = '#28a745';
+                    break;
+                case 'processing_question':
+                    statusElement.style.background = '#ffc107';
+                    statusElement.style.color = '#212529';
+                    break;
+                case 'completed':
+                    statusElement.style.background = '#28a745';
+                    break;
+                case 'error':
+                    statusElement.style.background = '#dc3545';
+                    break;
+                case 'timeout':
+                    statusElement.style.background = '#dc3545';
+                    break;
+                default:
+                    statusElement.style.background = '#6c757d';
+            }
+        }
+
+
 
         function showResults(result) {
             currentResults = result.results;
@@ -628,6 +877,7 @@
             document.getElementById('filePreview').style.display = 'none';
             document.getElementById('processBtn').style.display = 'none';
             document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('analysisWindow').style.display = 'none';
             document.querySelector('.upload-section').style.display = 'block';
             currentResults = [];
             window.selectedFile = null;

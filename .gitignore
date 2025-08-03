@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.production
+.env.development
+.env.test
 
 # Python
 __pycache__/
@@ -32,6 +34,7 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
 
 # IDE
 .vscode/
@@ -39,6 +42,9 @@ venv.bak/
 *.swp
 *.swo
 *~
+.project
+.pydevproject
+.settings/
 
 # OS
 .DS_Store
@@ -48,20 +54,25 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
 # Flask
 instance/
 .webassets-cache
+flask_session/
 
 # Temporary files
 *.tmp
 *.temp
 temp/
 tmp/
+*.bak
+*.backup
 
 # Logs
 *.log
 logs/
+log/
 
 # Database
 *.db
@@ -70,4 +81,84 @@ logs/
 
 # Excel files (for testing)
 test_files/
-uploads/ 
+uploads/
+*.xlsx
+*.xls
+!test_questions.xlsx
+!test_spanish_questions.xlsx
+
+# Test files
+test_*.py
+*_test.py
+pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+
+# Documentation
+docs/_build/
+site/
+
+# Node.js (if any frontend build tools are used)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.orig
+*.rej
+
+# Local configuration
+config.local.py
+settings.local.py
+
+# Cache directories
+.cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/ 
