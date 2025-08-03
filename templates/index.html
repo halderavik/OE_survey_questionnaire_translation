@@ -721,58 +721,101 @@
                 window.progressEventSource.close();
             }
             
-            console.log('🔄 Starting SSE connection to /progress...');
+            console.log('🔄 Starting progress monitoring...');
+            
+            // Use polling as primary method for Heroku compatibility
+            startPollingProgress();
+            
+            // Also try SSE as backup (but don't rely on it)
+            startSSEConnection();
+        }
+
+        function startPollingProgress() {
+            console.log('📡 Starting polling-based progress monitoring...');
+            
+            // Clear any existing polling interval
+            if (window.progressPollingInterval) {
+                clearInterval(window.progressPollingInterval);
+            }
+            
+            // Poll every 2 seconds
+            window.progressPollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/progress-simple');
+                    if (response.ok) {
+                        const progressData = await response.json();
+                        console.log('📊 Polling update received:', progressData);
+                        updateProgressFromBackend(progressData);
+                        
+                        // Stop polling if processing is complete
+                        if (progressData.status === 'completed' || progressData.status === 'error') {
+                            console.log('✅ Processing complete, stopping polling');
+                            clearInterval(window.progressPollingInterval);
+                            window.progressPollingInterval = null;
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Polling error:', error);
+                }
+            }, 2000);
+            
+            // Set a timeout to stop polling after 5 minutes
+            setTimeout(() => {
+                if (window.progressPollingInterval) {
+                    console.log('⏰ Polling timeout, stopping...');
+                    clearInterval(window.progressPollingInterval);
+                    window.progressPollingInterval = null;
+                }
+            }, 300000); // 5 minutes
+        }
+
+        function startSSEConnection() {
+            console.log('🔄 Starting SSE connection as backup...');
             
             // Create new EventSource for real-time updates
             window.progressEventSource = new EventSource('/progress');
             
-            // Set a shorter timeout for the connection (15 seconds to be safe)
-            window.progressTimeout = setTimeout(() => {
-                console.log('⏰ SSE connection timeout, reconnecting...');
+            // Set a shorter timeout for the connection (10 seconds)
+            setTimeout(() => {
+                console.log('⏰ SSE connection timeout, closing...');
                 if (window.progressEventSource) {
                     window.progressEventSource.close();
+                    window.progressEventSource = null;
                 }
-                startProgressMonitoring();
-            }, 15000);
+            }, 10000);
             
             window.progressEventSource.onopen = function(event) {
-                console.log('✅ SSE connection opened');
+                console.log('✅ SSE connection opened (backup)');
             };
             
             window.progressEventSource.onmessage = function(event) {
                 try {
-                    console.log('📨 SSE message received:', event.data);
+                    console.log('📨 SSE message received (backup):', event.data);
                     const progressData = JSON.parse(event.data);
                     
                     // Handle timeout message from server
                     if (progressData.status === 'timeout') {
-                        console.log('🔄 Server timeout, reconnecting...');
-                        setTimeout(() => {
-                            if (window.progressEventSource) {
-                                window.progressEventSource.close();
-                            }
-                            startProgressMonitoring();
-                        }, 1000);
+                        console.log('🔄 Server SSE timeout, closing SSE connection...');
+                        if (window.progressEventSource) {
+                            window.progressEventSource.close();
+                            window.progressEventSource = null;
+                        }
                         return;
                     }
                     
                     updateProgressFromBackend(progressData);
                 } catch (error) {
-                    console.error('❌ Error parsing progress data:', error);
-                    console.error('Raw data:', event.data);
+                    console.error('❌ Error parsing SSE data:', error);
+                    console.error('Raw SSE data:', event.data);
                 }
             };
             
             window.progressEventSource.onerror = function(error) {
-                console.error('❌ EventSource error:', error);
-                console.log('🔄 Reconnecting after error...');
-                // Reconnect after a short delay
-                setTimeout(() => {
-                    if (window.progressEventSource) {
-                        window.progressEventSource.close();
-                    }
-                    startProgressMonitoring();
-                }, 2000);
+                console.log('❌ SSE error (backup), closing connection...');
+                if (window.progressEventSource) {
+                    window.progressEventSource.close();
+                    window.progressEventSource = null;
+                }
             };
         }
 

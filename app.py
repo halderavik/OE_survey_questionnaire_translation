@@ -283,7 +283,7 @@ def process_excel_file_with_timeout(filepath):
             # Convert to standard Python int to avoid JSON serialization issues
             row_number = int(row_number)
             
-            # Update progress for current question
+                                # Update progress for current question
             app.current_progress.update({
                 'status': 'processing_question',
                 'message': f'Processing question {i+1}/{total_questions} (Row {row_number})',
@@ -295,6 +295,9 @@ def process_excel_file_with_timeout(filepath):
                 'processing_time': f'{i+1}/{total_questions} questions processed',
                 'api_response_time': 'Language detection in progress...'
             })
+            
+            # Force a small delay to ensure progress is updated
+            time.sleep(0.1)
             
             print(f"\n--- Question {i+1}/{total_questions} (Row {row_number}) ---")
             print(f"📝 Original: {question[:100]}{'...' if len(question) > 100 else ''}")
@@ -310,6 +313,9 @@ def process_excel_file_with_timeout(filepath):
                     'translation': result['english_translation'][:100] + ('...' if len(result['english_translation']) > 100 else ''),
                     'api_response_time': 'Translation completed'
                 })
+                
+                # Force a small delay to ensure progress is updated
+                time.sleep(0.1)
                 
                 print(f"✅ Question {i+1} (Row {row_number}) processed successfully")
                 print(f"   Language: {result['detected_language']}")
