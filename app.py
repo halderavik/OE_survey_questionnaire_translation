@@ -151,9 +151,9 @@ def upload_file():
         print(f"✅ File saved to: {filepath}")
         
         try:
-            # Process the file
+            # Process the file with timeout handling
             print("🔄 Starting file processing...")
-            result = process_excel_file(filepath)
+            result = process_excel_file_with_timeout(filepath)
             print("✅ File processing completed successfully")
             return jsonify(result)
         except Exception as e:
@@ -172,10 +172,10 @@ def upload_file():
         print(f"❌ Error in upload_file: {str(e)}")
         return jsonify({'error': f'Upload error: {str(e)}'}), 500
 
-def process_excel_file(filepath):
-    """Process Excel file and return translation results."""
+def process_excel_file_with_timeout(filepath):
+    """Process Excel file with Heroku timeout handling."""
     print("\n" + "="*50)
-    print("📊 EXCEL FILE PROCESSING")
+    print("📊 EXCEL FILE PROCESSING (TIMEOUT-AWARE)")
     print("="*50)
     
     try:
@@ -220,14 +220,33 @@ def process_excel_file(filepath):
             'total_questions': len(questions)
         })
         
-        # Process questions with DeepSeek API
+        # Process questions with DeepSeek API (optimized for Heroku timeout)
         results = []
         total_questions = len(questions)
         
         print(f"\n🔄 Starting API processing for {total_questions} questions...")
         print("="*50)
         
+        # Process questions in smaller batches to avoid timeout
+        batch_size = 5  # Process 5 questions at a time
+        start_time = time.time()
+        
         for i, question in enumerate(questions):
+            # Check if we're approaching Heroku's 30-second timeout (use 25 seconds to be safe)
+            if time.time() - start_time > 25:
+                print(f"⚠️ Approaching Heroku timeout, stopping processing at question {i+1}")
+                # Add remaining questions as pending
+                for j in range(i, total_questions):
+                    results.append({
+                        'question_number': j + 1,
+                        'row_number': int(df[df.iloc[:, 0] == questions[j]].index[0] + 1 if len(df[df.iloc[:, 0] == questions[j]]) > 0 else j + 1),
+                        'original_question': questions[j],
+                        'detected_language': 'Pending (timeout)',
+                        'confidence': 0,
+                        'english_translation': 'Processing stopped due to timeout'
+                    })
+                break
+            
             # Find the actual row number in the Excel file
             row_number = df[df.iloc[:, 0] == question].index[0] + 1 if len(df[df.iloc[:, 0] == question]) > 0 else i + 1
             # Convert to standard Python int to avoid JSON serialization issues
@@ -286,22 +305,30 @@ def process_excel_file(filepath):
                 })
         
         # Update progress for completion
+        processed_count = len([r for r in results if r['detected_language'] not in ['Error', 'Pending (timeout)']])
+        pending_count = len([r for r in results if r['detected_language'] == 'Pending (timeout)'])
+        
+        completion_message = f'Processing completed! {processed_count}/{total_questions} questions processed'
+        if pending_count > 0:
+            completion_message += f' ({pending_count} pending due to timeout)'
+        
         app.current_progress.update({
             'status': 'completed',
-            'message': 'Processing completed successfully!',
+            'message': completion_message,
             'current_question': total_questions,
             'detected_language': 'Multiple languages detected',
             'confidence': 0,
-            'translation': 'All questions translated to English',
-            'processing_time': f'Total: {total_questions} questions processed',
-            'api_response_time': 'All translations completed'
+            'translation': f'{processed_count}/{total_questions} questions translated to English',
+            'processing_time': f'Total: {processed_count} questions processed',
+            'api_response_time': 'Processing completed'
         })
         
         print("\n" + "="*50)
-        print("✅ ALL QUESTIONS PROCESSED")
-        print(f"📊 Total processed: {len(results)}")
-        print(f"📊 Successful: {len([r for r in results if r['detected_language'] != 'Error'])}")
+        print("✅ PROCESSING COMPLETED")
+        print(f"📊 Total questions: {len(results)}")
+        print(f"📊 Successfully processed: {len([r for r in results if r['detected_language'] not in ['Error', 'Pending (timeout)']])}")
         print(f"📊 Errors: {len([r for r in results if r['detected_language'] == 'Error'])}")
+        print(f"📊 Pending (timeout): {len([r for r in results if r['detected_language'] == 'Pending (timeout)'])}")
         print("="*50)
         
         return {
@@ -391,7 +418,7 @@ def process_question(question, question_number, row_number=None):
                 app.config['DEEPSEEK_API_URL'],
                 headers=headers,
                 json=language_data,
-                timeout=15  # Reduced timeout for faster feedback
+                timeout=10  # Further reduced timeout for Heroku
             )
             end_time = datetime.now()
             api_time = (end_time - start_time).total_seconds()
@@ -494,7 +521,7 @@ def process_question(question, question_number, row_number=None):
                 app.config['DEEPSEEK_API_URL'],
                 headers=headers,
                 json=translation_data,
-                timeout=15  # Reduced timeout for faster feedback
+                timeout=10  # Further reduced timeout for Heroku
             )
             end_time = datetime.now()
             api_time = (end_time - start_time).total_seconds()
