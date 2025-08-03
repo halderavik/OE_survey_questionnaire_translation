@@ -362,6 +362,7 @@ def process_question(question, question_number, row_number=None):
             if hasattr(app, 'current_progress'):
                 app.current_progress.update({
                     'detected_language': 'Detecting language...',
+                    'confidence': 0,
                     'api_response_time': 'Language detection API call in progress...'
                 })
             
@@ -413,6 +414,14 @@ def process_question(question, question_number, row_number=None):
                         # Already a percentage, just convert to int
                         language_info['confidence'] = int(confidence_value)
                     print(f"  📊 Confidence converted to percentage: {language_info['confidence']}%")
+                
+                # Update progress with detected language and confidence
+                if hasattr(app, 'current_progress'):
+                    app.current_progress.update({
+                        'detected_language': language_info.get('language', 'Unknown'),
+                        'confidence': language_info.get('confidence', 0),
+                        'api_response_time': 'Language detection completed'
+                    })
                     
             except (KeyError, json.JSONDecodeError) as e:
                 # Fallback: assume English if parsing fails
@@ -420,6 +429,14 @@ def process_question(question, question_number, row_number=None):
                 print(f"  📝 Raw content: {language_content}")
                 language_info = {"language": "English", "confidence": 90}
                 print(f"  🔄 Using fallback: {language_info}")
+                
+                # Update progress with fallback values
+                if hasattr(app, 'current_progress'):
+                    app.current_progress.update({
+                        'detected_language': language_info['language'],
+                        'confidence': language_info['confidence'],
+                        'api_response_time': 'Language detection completed (fallback)'
+                    })
                 
         except requests.exceptions.RequestException as e:
             raise Exception(f"Network error during language detection: {str(e)}")
@@ -473,6 +490,13 @@ def process_question(question, question_number, row_number=None):
             translation_result = translation_response.json()
             english_translation = translation_result['choices'][0]['message']['content'].strip()
             print(f"  📝 Translation result: {english_translation[:50]}{'...' if len(english_translation) > 50 else ''}")
+            
+            # Update progress with translation result
+            if hasattr(app, 'current_progress'):
+                app.current_progress.update({
+                    'translation': english_translation[:100] + ('...' if len(english_translation) > 100 else ''),
+                    'api_response_time': 'Translation completed'
+                })
             
         except requests.exceptions.RequestException as e:
             raise Exception(f"Network error during translation: {str(e)}")
