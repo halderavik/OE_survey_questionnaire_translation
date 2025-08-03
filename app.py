@@ -70,8 +70,8 @@ def progress_stream():
         last_progress = None
         
         while True:
-            # Check for timeout (20 seconds to be safe)
-            if time.time() - start_time > 20:
+            # Check for timeout (15 seconds to be safe on Heroku)
+            if time.time() - start_time > 15:
                 # Send a keepalive message and break
                 yield f"data: {json.dumps({'status': 'timeout', 'message': 'Connection timeout - please reconnect'})}\n\n"
                 break
@@ -90,10 +90,10 @@ def progress_stream():
                 if 'confidence' in progress_data:
                     progress_data['confidence'] = int(progress_data['confidence'])
                 
-                # Only send if data has changed or it's been more than 1 second
+                # Only send if data has changed or it's been more than 0.5 seconds
                 current_time = time.time()
                 if (last_progress != progress_data or 
-                    current_time - start_time > 1):
+                    current_time - start_time > 0.5):
                     yield f"data: {json.dumps(progress_data)}\n\n"
                     last_progress = progress_data.copy()
                     
@@ -101,7 +101,8 @@ def progress_stream():
                     if progress_data.get('status') in ['completed', 'error']:
                         break
             
-            time.sleep(0.3)  # Update every 300ms for more responsive updates
+            # Shorter sleep for more responsive updates
+            time.sleep(0.2)
     
     return app.response_class(
         generate(),
@@ -109,8 +110,9 @@ def progress_stream():
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',  # Disable Nginx buffering
             'Access-Control-Allow-Origin': '*',
-            'X-Accel-Buffering': 'no'  # Disable nginx buffering
+            'Access-Control-Allow-Headers': 'Cache-Control'
         }
     )
 
@@ -144,6 +146,41 @@ def progress_simple():
             'processing_time': '',
             'api_response_time': ''
         })
+
+@app.route('/continue-batch', methods=['POST'])
+def continue_batch():
+    """Continue processing the next batch of questions."""
+    try:
+        print("\n" + "="*50)
+        print("🔄 CONTINUE BATCH PROCESSING")
+        print("="*50)
+        
+        # Check if there are pending questions
+        if not hasattr(app, 'pending_questions') or not hasattr(app, 'current_batch_start'):
+            return jsonify({'error': 'No pending questions to process'}), 400
+        
+        total_questions = len(app.pending_questions)
+        current_batch_start = app.current_batch_start
+        
+        if current_batch_start >= total_questions:
+            return jsonify({'error': 'All questions have been processed'}), 400
+        
+        print(f"📊 Continuing from question {current_batch_start + 1}")
+        print(f"📊 Remaining questions: {total_questions - current_batch_start}")
+        
+        # Create a temporary file path for the batch processing
+        # Since we don't have the original file, we'll use a dummy path
+        # The actual questions are stored in app.pending_questions
+        dummy_filepath = "/tmp/batch_continuation.xlsx"
+        
+        # Process the next batch
+        result = process_excel_file_with_timeout(dummy_filepath)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Error continuing batch: {str(e)}")
+        return jsonify({'error': f'Batch continuation error: {str(e)}'}), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -204,9 +241,9 @@ def upload_file():
         return jsonify({'error': f'Upload error: {str(e)}'}), 500
 
 def process_excel_file_with_timeout(filepath):
-    """Process Excel file with Heroku timeout handling."""
+    """Process Excel file with batch processing to handle Heroku timeout limits."""
     print("\n" + "="*50)
-    print("📊 EXCEL FILE PROCESSING (TIMEOUT-AWARE)")
+    print("📊 EXCEL FILE PROCESSING (BATCH-AWARE)")
     print("="*50)
     
     try:
@@ -244,34 +281,52 @@ def process_excel_file_with_timeout(filepath):
         
         print(f"✅ Question count validated: {len(questions)} questions")
         
-        # Update progress for processing start
-        app.current_progress.update({
-            'status': 'processing',
-            'message': f'Starting API processing for {len(questions)} questions...',
-            'total_questions': len(questions)
-        })
+        # Store questions in session for batch processing
+        if not hasattr(app, 'pending_questions'):
+            app.pending_questions = questions
+            app.processed_results = []
+            app.current_batch_start = 0
         
-        # Process questions with DeepSeek API (optimized for Heroku timeout)
-        results = []
-        total_questions = len(questions)
+        # Get current batch info
+        batch_size = 3  # Process 3 questions per batch
+        total_questions = len(app.pending_questions)
+        current_batch_start = getattr(app, 'current_batch_start', 0)
         
-        print(f"\n🔄 Starting API processing for {total_questions} questions...")
+        # Calculate batch end
+        batch_end = min(current_batch_start + batch_size, total_questions)
+        current_batch_questions = app.pending_questions[current_batch_start:batch_end]
+        
+        print(f"\n🔄 Processing batch {current_batch_start//batch_size + 1}: questions {current_batch_start + 1}-{batch_end}")
+        print(f"📊 Batch size: {len(current_batch_questions)} questions")
+        print(f"📊 Total progress: {len(app.processed_results)}/{total_questions} completed")
         print("="*50)
         
-        # Process questions in smaller batches to avoid timeout
-        batch_size = 5  # Process 5 questions at a time
+        # Update progress for batch start
+        app.current_progress.update({
+            'status': 'processing_batch',
+            'message': f'Processing batch {current_batch_start//batch_size + 1}: questions {current_batch_start + 1}-{batch_end}',
+            'total_questions': total_questions,
+            'current_question': current_batch_start + 1
+        })
+        
+        # Process current batch
+        batch_results = []
         start_time = time.time()
         
-        for i, question in enumerate(questions):
+        for i, question in enumerate(current_batch_questions):
             # Check if we're approaching Heroku's 30-second timeout (use 25 seconds to be safe)
             if time.time() - start_time > 25:
-                print(f"⚠️ Approaching Heroku timeout, stopping processing at question {i+1}")
-                # Add remaining questions as pending
-                for j in range(i, total_questions):
-                    results.append({
-                        'question_number': j + 1,
-                        'row_number': int(df[df.iloc[:, 0] == questions[j]].index[0] + 1 if len(df[df.iloc[:, 0] == questions[j]]) > 0 else j + 1),
-                        'original_question': questions[j],
+                print(f"⚠️ Approaching Heroku timeout, stopping batch at question {current_batch_start + i + 1}")
+                # Add remaining questions in this batch as pending
+                for j in range(i, len(current_batch_questions)):
+                    global_question_index = current_batch_start + j
+                    row_number = df[df.iloc[:, 0] == app.pending_questions[global_question_index]].index[0] + 1 if len(df[df.iloc[:, 0] == app.pending_questions[global_question_index]]) > 0 else global_question_index + 1
+                    row_number = int(row_number)
+                    
+                    batch_results.append({
+                        'question_number': global_question_index + 1,
+                        'row_number': row_number,
+                        'original_question': app.pending_questions[global_question_index],
                         'detected_language': 'Pending (timeout)',
                         'confidence': 0,
                         'english_translation': 'Processing stopped due to timeout'
@@ -279,32 +334,32 @@ def process_excel_file_with_timeout(filepath):
                 break
             
             # Find the actual row number in the Excel file
-            row_number = df[df.iloc[:, 0] == question].index[0] + 1 if len(df[df.iloc[:, 0] == question]) > 0 else i + 1
-            # Convert to standard Python int to avoid JSON serialization issues
+            global_question_index = current_batch_start + i
+            row_number = df[df.iloc[:, 0] == question].index[0] + 1 if len(df[df.iloc[:, 0] == question]) > 0 else global_question_index + 1
             row_number = int(row_number)
             
-                                # Update progress for current question
+            # Update progress for current question
             app.current_progress.update({
                 'status': 'processing_question',
-                'message': f'Processing question {i+1}/{total_questions} (Row {row_number})',
-                'current_question': i + 1,
+                'message': f'Processing question {global_question_index + 1}/{total_questions} (Row {row_number})',
+                'current_question': global_question_index + 1,
                 'current_row': row_number,
                 'detected_language': 'Analyzing...',
                 'confidence': 0,
                 'translation': 'Waiting for language detection...',
-                'processing_time': f'{i+1}/{total_questions} questions processed',
+                'processing_time': f'{global_question_index + 1}/{total_questions} questions processed',
                 'api_response_time': 'Language detection in progress...'
             })
             
             # Force a small delay to ensure progress is updated
             time.sleep(0.1)
             
-            print(f"\n--- Question {i+1}/{total_questions} (Row {row_number}) ---")
+            print(f"\n--- Question {global_question_index + 1}/{total_questions} (Row {row_number}) ---")
             print(f"📝 Original: {question[:100]}{'...' if len(question) > 100 else ''}")
             
             try:
-                result = process_question(question, i + 1, row_number)
-                results.append(result)
+                result = process_question(question, global_question_index + 1, row_number)
+                batch_results.append(result)
                 
                 # Update progress with results
                 app.current_progress.update({
@@ -317,15 +372,15 @@ def process_excel_file_with_timeout(filepath):
                 # Force a small delay to ensure progress is updated
                 time.sleep(0.1)
                 
-                print(f"✅ Question {i+1} (Row {row_number}) processed successfully")
+                print(f"✅ Question {global_question_index + 1} (Row {row_number}) processed successfully")
                 print(f"   Language: {result['detected_language']}")
                 print(f"   Confidence: {result['confidence']}%")
                 print(f"   Translation: {result['english_translation'][:50]}{'...' if len(result['english_translation']) > 50 else ''}")
             except Exception as e:
-                print(f"❌ Error processing question {i+1} (Row {row_number}): {str(e)}")
+                print(f"❌ Error processing question {global_question_index + 1} (Row {row_number}): {str(e)}")
                 # Add error result but continue processing
-                results.append({
-                    'question_number': i + 1,
+                batch_results.append({
+                    'question_number': global_question_index + 1,
                     'row_number': row_number,
                     'original_question': question,
                     'detected_language': 'Error',
@@ -341,39 +396,87 @@ def process_excel_file_with_timeout(filepath):
                     'api_response_time': 'Error occurred'
                 })
         
-        # Update progress for completion
-        processed_count = len([r for r in results if r['detected_language'] not in ['Error', 'Pending (timeout)']])
-        pending_count = len([r for r in results if r['detected_language'] == 'Pending (timeout)'])
+        # Add batch results to processed results
+        app.processed_results.extend(batch_results)
         
-        completion_message = f'Processing completed! {processed_count}/{total_questions} questions processed'
-        if pending_count > 0:
-            completion_message += f' ({pending_count} pending due to timeout)'
+        # Update batch start for next batch
+        app.current_batch_start = batch_end
         
-        app.current_progress.update({
-            'status': 'completed',
-            'message': completion_message,
-            'current_question': total_questions,
-            'detected_language': 'Multiple languages detected',
-            'confidence': 0,
-            'translation': f'{processed_count}/{total_questions} questions translated to English',
-            'processing_time': f'Total: {processed_count} questions processed',
-            'api_response_time': 'Processing completed'
-        })
-        
-        print("\n" + "="*50)
-        print("✅ PROCESSING COMPLETED")
-        print(f"📊 Total questions: {len(results)}")
-        print(f"📊 Successfully processed: {len([r for r in results if r['detected_language'] not in ['Error', 'Pending (timeout)']])}")
-        print(f"📊 Errors: {len([r for r in results if r['detected_language'] == 'Error'])}")
-        print(f"📊 Pending (timeout): {len([r for r in results if r['detected_language'] == 'Pending (timeout)'])}")
-        print("="*50)
-        
-        return {
-            'success': True,
-            'results': results,
-            'total_questions': len(questions),
-            'processed_at': datetime.now().isoformat()
-        }
+        # Check if all questions are processed
+        if batch_end >= total_questions:
+            # All questions processed
+            processed_count = len([r for r in app.processed_results if r['detected_language'] not in ['Error', 'Pending (timeout)']])
+            pending_count = len([r for r in app.processed_results if r['detected_language'] == 'Pending (timeout)'])
+            
+            completion_message = f'Processing completed! {processed_count}/{total_questions} questions processed'
+            if pending_count > 0:
+                completion_message += f' ({pending_count} pending due to timeout)'
+            
+            app.current_progress.update({
+                'status': 'completed',
+                'message': completion_message,
+                'current_question': total_questions,
+                'detected_language': 'Multiple languages detected',
+                'confidence': 0,
+                'translation': f'{processed_count}/{total_questions} questions translated to English',
+                'processing_time': f'Total: {processed_count} questions processed',
+                'api_response_time': 'Processing completed'
+            })
+            
+            # Clear session data
+            delattr(app, 'pending_questions')
+            delattr(app, 'processed_results')
+            delattr(app, 'current_batch_start')
+            
+            print("\n" + "="*50)
+            print("✅ ALL BATCHES COMPLETED")
+            print(f"📊 Total questions: {len(app.processed_results)}")
+            print(f"📊 Successfully processed: {len([r for r in app.processed_results if r['detected_language'] not in ['Error', 'Pending (timeout)']])}")
+            print(f"📊 Errors: {len([r for r in app.processed_results if r['detected_language'] == 'Error'])}")
+            print(f"📊 Pending (timeout): {len([r for r in app.processed_results if r['detected_language'] == 'Pending (timeout)'])}")
+            print("="*50)
+            
+            return {
+                'success': True,
+                'results': app.processed_results,
+                'total_questions': total_questions,
+                'processed_at': datetime.now().isoformat(),
+                'batch_complete': True
+            }
+        else:
+            # More batches to process
+            processed_count = len([r for r in app.processed_results if r['detected_language'] not in ['Error', 'Pending (timeout)']])
+            
+            batch_completion_message = f'Batch {current_batch_start//batch_size + 1} completed! {processed_count}/{total_questions} questions processed so far'
+            
+            app.current_progress.update({
+                'status': 'batch_completed',
+                'message': batch_completion_message,
+                'current_question': batch_end,
+                'detected_language': 'Batch completed',
+                'confidence': 0,
+                'translation': f'{processed_count}/{total_questions} questions translated to English',
+                'processing_time': f'Batch {current_batch_start//batch_size + 1} completed',
+                'api_response_time': 'Ready for next batch'
+            })
+            
+            print("\n" + "="*50)
+            print(f"✅ BATCH {current_batch_start//batch_size + 1} COMPLETED")
+            print(f"📊 Questions processed in this batch: {len(batch_results)}")
+            print(f"📊 Total progress: {len(app.processed_results)}/{total_questions}")
+            print(f"📊 Next batch: questions {batch_end + 1}-{min(batch_end + batch_size, total_questions)}")
+            print("="*50)
+            
+            return {
+                'success': True,
+                'results': app.processed_results,
+                'total_questions': total_questions,
+                'processed_at': datetime.now().isoformat(),
+                'batch_complete': False,
+                'next_batch_start': batch_end,
+                'remaining_questions': total_questions - batch_end,
+                'batch_message': f'Batch {current_batch_start//batch_size + 1} completed. {total_questions - batch_end} questions remaining.'
+            }
         
     except Exception as e:
         print(f"❌ Excel processing error: {str(e)}")
