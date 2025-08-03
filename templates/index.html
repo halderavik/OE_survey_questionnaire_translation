@@ -969,19 +969,7 @@
             document.getElementById('resultsSummary').textContent = 
                 `Processed ${result.total_questions} questions on ${new Date(result.processed_at).toLocaleString()}`;
             
-            const tbody = document.getElementById('resultsBody');
-            tbody.innerHTML = '';
-            
-            result.results.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${escapeHtml(row.original_question)}</td>
-                    <td>${escapeHtml(row.detected_language)}</td>
-                    <td class="${getConfidenceClass(row.confidence)}">${row.confidence}%</td>
-                    <td>${escapeHtml(row.english_translation)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+            displayResultsTable(result.results);
             
             document.getElementById('resultsSection').style.display = 'block';
             document.querySelector('.upload-section').style.display = 'none';
@@ -1084,6 +1072,22 @@
             progressText.textContent = 'Auto-continuation failed. Please click "Continue Next Batch" to proceed manually.';
         }
         
+        function displayResultsTable(results) {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            
+            results.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(row.original_question)}</td>
+                    <td>${escapeHtml(row.detected_language)}</td>
+                    <td class="${getConfidenceClass(row.confidence)}">${row.confidence}%</td>
+                    <td>${escapeHtml(row.english_translation)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         function showBatchCompletion(response) {
             // Keep progress container visible for auto-continuation
             const progressContainer = document.getElementById('progressContainer');
