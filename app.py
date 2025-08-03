@@ -64,9 +64,18 @@ def test_endpoint():
 
 @app.route('/progress', methods=['GET'])
 def progress_stream():
-    """Stream real-time progress updates."""
+    """Stream real-time progress updates with Heroku timeout handling."""
     def generate():
+        start_time = time.time()
+        last_progress = None
+        
         while True:
+            # Check for timeout (25 seconds to be safe)
+            if time.time() - start_time > 25:
+                # Send a keepalive message and break
+                yield f"data: {json.dumps({'status': 'timeout', 'message': 'Connection timeout - please reconnect'})}\n\n"
+                break
+            
             # Get the latest progress from global state
             if hasattr(app, 'current_progress'):
                 progress_data = app.current_progress.copy()
@@ -81,7 +90,17 @@ def progress_stream():
                 if 'confidence' in progress_data:
                     progress_data['confidence'] = int(progress_data['confidence'])
                 
-                yield f"data: {json.dumps(progress_data)}\n\n"
+                # Only send if data has changed or it's been more than 2 seconds
+                current_time = time.time()
+                if (last_progress != progress_data or 
+                    current_time - start_time > 2):
+                    yield f"data: {json.dumps(progress_data)}\n\n"
+                    last_progress = progress_data.copy()
+                    
+                    # If processing is complete, break the connection
+                    if progress_data.get('status') in ['completed', 'error']:
+                        break
+            
             time.sleep(0.5)  # Update every 500ms
     
     return app.response_class(
@@ -90,7 +109,8 @@ def progress_stream():
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'X-Accel-Buffering': 'no'  # Disable nginx buffering
         }
     )
 

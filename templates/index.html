@@ -724,9 +724,31 @@
             // Create new EventSource for real-time updates
             window.progressEventSource = new EventSource('/progress');
             
+            // Set a timeout for the connection (20 seconds)
+            window.progressTimeout = setTimeout(() => {
+                console.log('⏰ SSE connection timeout, reconnecting...');
+                if (window.progressEventSource) {
+                    window.progressEventSource.close();
+                }
+                startProgressMonitoring();
+            }, 20000);
+            
             window.progressEventSource.onmessage = function(event) {
                 try {
                     const progressData = JSON.parse(event.data);
+                    
+                    // Handle timeout message from server
+                    if (progressData.status === 'timeout') {
+                        console.log('🔄 SSE connection timeout, reconnecting...');
+                        setTimeout(() => {
+                            if (window.progressEventSource) {
+                                window.progressEventSource.close();
+                            }
+                            startProgressMonitoring();
+                        }, 1000);
+                        return;
+                    }
+                    
                     updateProgressFromBackend(progressData);
                 } catch (error) {
                     console.error('Error parsing progress data:', error);
@@ -735,7 +757,13 @@
             
             window.progressEventSource.onerror = function(error) {
                 console.error('EventSource error:', error);
-                // Don't close the connection on error, let it reconnect
+                // Reconnect after a short delay
+                setTimeout(() => {
+                    if (window.progressEventSource) {
+                        window.progressEventSource.close();
+                    }
+                    startProgressMonitoring();
+                }, 2000);
             };
         }
 
