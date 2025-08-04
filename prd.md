@@ -2,7 +2,7 @@
 
 ## Product Overview
 
-The Survey Question Translator MVP is a professional web application built with Flask that enables researchers and survey professionals to translate survey questions from multiple languages into English. Users upload Excel files containing survey questions, and the application provides language detection, confidence scoring, and accurate translations powered by DeepSeek AI.
+The Survey Question Translator MVP is a professional web application built with Flask that enables researchers and survey professionals to translate survey questions from multiple languages into English. Users upload Excel files containing survey questions, and the application provides language detection, confidence scoring, and accurate translations powered by DeepSeek AI. The system processes questions sequentially in real-time with comprehensive progress tracking.
 
 ## Target Users
 
@@ -20,11 +20,12 @@ The Survey Question Translator MVP is a professional web application built with 
 - **File Validation**: Automatic format and structure validation
 - **Preview Display**: Show first few questions for confirmation
 
-### 2. AI-Powered Processing
+### 2. AI-Powered Sequential Processing
 - **Language Detection**: Automatic identification of each question's language
 - **Confidence Scoring**: Percentage confidence for each detection
-- **Batch Translation**: Simultaneous translation of all questions to English
+- **Sequential Translation**: Each question processed one by one in order
 - **Quality Indicators**: Visual confidence level indicators
+- **Real-Time Progress**: Live updates showing current question being processed
 
 ### 3. Professional Results Display
 - **Structured Table**: Clean, organized results presentation
@@ -51,12 +52,14 @@ The Survey Question Translator MVP is a professional web application built with 
 4. Preview shows first 5 questions for confirmation
 5. User clicks "Process Questions" to continue
 
-### Step 2: AI Processing
+### Step 2: Sequential AI Processing
 1. System extracts questions from Excel file
-2. DeepSeek API detects language for each question
-3. Confidence scores calculated for each detection
-4. All questions translated to English simultaneously
-5. Real-time progress bar shows processing status
+2. Each question processed sequentially in order
+3. DeepSeek API detects language for each question
+4. Confidence scores calculated for each detection
+5. Each question translated to English individually
+6. Real-time progress bar shows processing status
+7. Live analysis window displays current question details
 
 ### Step 3: Results & Download
 1. Results displayed in professional table format
@@ -72,6 +75,7 @@ The Survey Question Translator MVP is a professional web application built with 
 - **File Size Limit**: Maximum 2MB Excel files
 - **Question Limit**: Up to 1000 questions per file
 - **Response Time**: Results displayed within 60 seconds for 100 questions
+- **Sequential Processing**: Each question processed one by one in order
 
 ### Supported Formats
 - **Input**: Excel files (.xlsx, .xls) with single column of questions
@@ -99,6 +103,7 @@ The Survey Question Translator MVP is a professional web application built with 
 - **Error Messages**: Clear, helpful error communication
 - **Success Feedback**: Confirmation messages for completed actions
 - **Mobile Responsive**: Optimized for tablet and desktop use
+- **Real-Time Updates**: Live progress tracking and analysis display
 
 ### Accessibility
 - **WCAG Compliance**: Level AA accessibility standards
@@ -133,6 +138,7 @@ The Survey Question Translator MVP is a professional web application built with 
 - **Processing Accuracy**: >95% translation quality
 - **Response Time**: <60 seconds for 100 questions
 - **File Format Support**: 100% compatibility with Excel formats
+- **Sequential Processing**: Reliable one-by-one question processing
 
 ### Business Value
 - **Translation Quality**: Accurate, context-aware translations
@@ -147,9 +153,10 @@ The Survey Question Translator MVP is a professional web application built with 
 - **Excel Format Only**: Limited to Excel input/output
 - **English Translation**: Output only in English
 - **Basic Column Structure**: Single column input required
+- **Sequential Processing**: Questions processed one by one in order
 
 ### Future Enhancements (Post-MVP)
-- Multiple file batch processing
+- Multiple file sequential processing
 - Support for CSV and other formats
 - Translation to multiple target languages
 - Advanced column mapping options
@@ -164,6 +171,7 @@ The Survey Question Translator MVP is a professional web application built with 
 - **Convenience**: Simple upload-process-download workflow
 - **Privacy**: No data retention or storage requirements
 - **Cost-Effective**: Affordable alternative to human translation
+- **Real-Time Tracking**: Live progress monitoring and analysis
 
 ### Use Cases
 - **Survey Localization**: Adapt questionnaires for international use
@@ -179,6 +187,7 @@ The Survey Question Translator MVP is a professional web application built with 
 - **File Format Issues**: Handle various Excel format variations
 - **Memory Management**: Efficient processing of large files
 - **Translation Quality**: Handle edge cases and unusual content
+- **Sequential Processing**: Ensure reliable one-by-one processing
 
 ### Business Risks
 - **User Adoption**: Ensure intuitive, professional user experience

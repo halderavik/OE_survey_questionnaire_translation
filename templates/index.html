@@ -644,18 +644,21 @@
                 console.log('📄 Response data:', result);
 
                 if (result.success) {
-                    console.log('✅ Upload successful, showing results');
+                    console.log('✅ Upload successful, processing completed');
+                    // Don't hide progress here - let the EventSource handle completion
+                    // The progress will be hidden when all questions are processed
                     showResults(result);
                 } else {
                     console.error('❌ Processing failed:', result.error);
                     showError(result.error || 'Processing failed');
+                    hideProgress();
                 }
             } catch (error) {
                 console.error('❌ Upload error:', error);
                 showError('Network error: ' + error.message);
+                hideProgress();
             } finally {
                 console.log('🏁 Upload process completed');
-                hideProgress();
                 processBtn.disabled = false;
             }
         });
@@ -736,6 +739,13 @@
             window.progressEventSource.onerror = function(error) {
                 console.error('EventSource error:', error);
                 // Don't close the connection on error, let it reconnect
+                // Add a small delay before attempting to reconnect
+                setTimeout(() => {
+                    if (window.progressEventSource && window.progressEventSource.readyState === EventSource.CLOSED) {
+                        console.log('🔄 Attempting to reconnect EventSource...');
+                        startProgressMonitoring();
+                    }
+                }, 1000);
             };
         }
 
@@ -767,13 +777,17 @@
             document.getElementById('processingTime').textContent = progressData.processing_time || '-';
             document.getElementById('apiResponseTime').textContent = progressData.api_response_time || '-';
             
-            // Handle completion
+            // Handle completion - wait for backend to finish processing all questions
             if (progressData.status === 'completed') {
                 document.getElementById('progressFill').style.width = '100%';
-                document.getElementById('progressText').textContent = 'Complete!';
-                if (window.progressEventSource) {
-                    window.progressEventSource.close();
-                }
+                document.getElementById('progressText').textContent = 'Complete! Processing all questions...';
+                
+                // Hide the analysis window when processing is completed
+                document.getElementById('analysisWindow').style.display = 'none';
+                
+                // Keep the EventSource open until we get the final results
+                // The backend will send the complete results when all questions are processed
+                console.log('✅ Processing completed, waiting for final results...');
             }
         }
 
@@ -831,6 +845,18 @@
 
         function showResults(result) {
             currentResults = result.results;
+            
+            // Close progress monitoring when results are shown
+            if (window.progressEventSource) {
+                window.progressEventSource.close();
+            }
+            if (window.progressTimeout) {
+                clearTimeout(window.progressTimeout);
+            }
+            
+            // Hide progress container
+            document.getElementById('progressContainer').style.display = 'none';
+            document.getElementById('analysisWindow').style.display = 'none';
             
             document.getElementById('resultsSummary').textContent = 
                 `Processed ${result.total_questions} questions on ${new Date(result.processed_at).toLocaleString()}`;

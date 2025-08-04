@@ -1,12 +1,12 @@
 # Survey Question Translator MVP
 
-A professional web application built with Flask that enables researchers and survey professionals to translate survey questions from multiple languages into English using DeepSeek AI. Features real-time progress tracking and live processing analysis.
+A professional web application built with Flask that enables researchers and survey professionals to translate survey questions from multiple languages into English using DeepSeek AI. Features real-time sequential processing with live progress tracking and comprehensive analysis.
 
 ## Features
 
 - **Simple File Upload**: Drag-and-drop Excel file upload (.xlsx, .xls)
 - **AI-Powered Processing**: Automatic language detection and translation using DeepSeek AI
-- **Real-Time Progress Tracking**: Live updates showing current question processing status
+- **Real-Time Sequential Processing**: Live updates showing each question being processed one by one
 - **Live Processing Analysis**: Real-time display of language detection, confidence scores, and translation progress
 - **Professional Results**: Clean, organized results with confidence scoring
 - **Excel Export**: One-click download of formatted results
@@ -102,16 +102,17 @@ A professional web application built with Flask that enables researchers and sur
 4. Preview the first 5 questions for confirmation
 5. Click "Process Questions" to continue
 
-### Step 2: Real-Time AI Processing
+### Step 2: Real-Time Sequential Processing
 1. **Live Progress Bar**: Shows overall processing progress
 2. **Real-Time Analysis Window**: Displays current processing details:
    - Current question number and row being processed
    - Detected language and confidence score
    - Translation progress and API response times
    - Processing time for each question
-3. **Automatic Language Detection**: AI detects the language of each question
-4. **Confidence Scoring**: Calculates confidence scores for language detection
-5. **English Translation**: Translates all questions to English
+3. **Sequential Processing**: Each question is processed one by one in order
+4. **Automatic Language Detection**: AI detects the language of each question
+5. **Confidence Scoring**: Calculates confidence scores for language detection
+6. **English Translation**: Translates each question to English
 
 ### Step 3: View Results & Download
 1. Results are displayed in a professional table format
@@ -161,19 +162,21 @@ Health check endpoint to verify application status.
 
 **Response**: JSON with application status
 
-## Real-Time Progress System
+## Real-Time Sequential Processing System
 
-The application features a sophisticated real-time progress tracking system:
+The application features a sophisticated real-time sequential processing system:
 
 ### Frontend Features
 - **Live Progress Bar**: Updates in real-time showing processing percentage
 - **Analysis Window**: Displays current question details, language detection, and translation status
 - **Status Indicators**: Color-coded status updates (uploading, processing, completed, error)
 - **Timeout Handling**: Automatic timeout warnings for long-running processes
+- **Sequential Display**: Shows each question being processed in order
 
 ### Backend Features
 - **Server-Sent Events (SSE)**: Real-time data streaming from backend to frontend
 - **Global Progress State**: Centralized progress tracking across all processing stages
+- **Sequential Processing**: Each question processed one by one in order
 - **Detailed Logging**: Comprehensive terminal output for debugging and monitoring
 - **Error Recovery**: Graceful handling of individual question failures
 
@@ -206,6 +209,7 @@ The application includes comprehensive error handling for:
 - **API Timeouts**: 15-second timeout per API call for responsive feedback
 - **File Size**: Maximum 2MB Excel files
 - **Question Limit**: Up to 1000 questions per file
+- **Sequential Processing**: Each question processed in order for reliable tracking
 
 ## Development
 
@@ -306,7 +310,15 @@ For support and questions, please refer to the project documentation or create a
 
 ## Changelog
 
-### Version 1.1.0 (Current)
+### Version 1.2.0 (Current)
+- **Sequential Processing**: Each question processed one by one in order
+- **Enhanced Real-Time Tracking**: Improved progress tracking with row numbers
+- **Analysis Window Management**: Proper hiding of analysis window on completion
+- **Performance Optimizations**: Reduced delays and improved reliability
+- **Error Recovery**: Better handling of processing interruptions
+- **Comprehensive Logging**: Enhanced backend logging for debugging
+
+### Version 1.1.0
 - **Real-Time Progress Tracking**: Added Server-Sent Events (SSE) for live progress updates
 - **Live Processing Analysis**: Real-time display of current question processing details
 - **Enhanced Error Handling**: Improved error recovery and user feedback

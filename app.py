@@ -245,6 +245,9 @@ def process_excel_file(filepath):
                 print(f"   Language: {result['detected_language']}")
                 print(f"   Confidence: {result['confidence']}%")
                 print(f"   Translation: {result['english_translation'][:50]}{'...' if len(result['english_translation']) > 50 else ''}")
+                
+                # Small delay to ensure progress updates are sent
+                time.sleep(0.1)
             except Exception as e:
                 print(f"❌ Error processing question {i+1} (Row {row_number}): {str(e)}")
                 # Add error result but continue processing
@@ -276,6 +279,9 @@ def process_excel_file(filepath):
             'processing_time': f'Total: {total_questions} questions processed',
             'api_response_time': 'All translations completed'
         })
+        
+        # Small delay to ensure completion status is sent
+        time.sleep(0.5)
         
         print("\n" + "="*50)
         print("✅ ALL QUESTIONS PROCESSED")
