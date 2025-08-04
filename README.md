@@ -31,10 +31,17 @@ A professional web application built with Flask that enables researchers and sur
 
 ### Setup Instructions
 
-1. **Clone the repository**
+1. **Clone the repository (Local Deployment Branch)**
+   ```bash
+   git clone -b local-deployment --single-branch https://github.com/halderavik/OE_survey_questionnaire_translation.git
+   cd OE_survey_questionnaire_translation
+   ```
+   
+   **Alternative: Clone main branch and switch to local-deployment**
    ```bash
    git clone https://github.com/halderavik/OE_survey_questionnaire_translation.git
    cd OE_survey_questionnaire_translation
+   git checkout local-deployment
    ```
 
 2. **Create a virtual environment**
