@@ -1,0 +1,23 @@
+[1mdiff --git a/README.md b/README.md[m
+[1mindex caffba9..e70818a 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -31,10 +31,17 @@[m [mA professional web application built with Flask that enables researchers and sur[m
+ [m
+ ### Setup Instructions[m
+ [m
+[31m-1. **Clone the repository**[m
+[32m+[m[32m1. **Clone the repository (Local Deployment Branch)**[m
+[32m+[m[32m   ```bash[m
+[32m+[m[32m   git clone -b local-deployment --single-branch https://github.com/halderavik/OE_survey_questionnaire_translation.git[m
+[32m+[m[32m   cd OE_survey_questionnaire_translation[m
+[32m+[m[32m   ```[m
+[32m+[m[41m   [m
+[32m+[m[32m   **Alternative: Clone main branch and switch to local-deployment**[m
+    ```bash[m
+    git clone https://github.com/halderavik/OE_survey_questionnaire_translation.git[m
+    cd OE_survey_questionnaire_translation[m
+[32m+[m[32m   git checkout local-deployment[m
+    ```[m
+ [m
+ 2. **Create a virtual environment**[m

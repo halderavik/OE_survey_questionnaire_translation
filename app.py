@@ -342,15 +342,18 @@ def process_question(question, question_number, row_number=None):
         
         # First, detect language
         language_prompt = f"""
-        Analyze the following text and provide the detected language and confidence score.
+        Analyze the following text and provide the detected language, confidence score, and a brief explanation for the confidence level.
         
         Text: "{question}"
         
         Respond with ONLY a valid JSON object in this exact format (no markdown, no code blocks):
         {{
             "language": "detected_language_name",
-            "confidence": confidence_score
+            "confidence": confidence_score,
+            "confidence_reason": "Brief explanation of why this confidence score was assigned (e.g., 'Clear French vocabulary and grammar patterns', 'Mixed language indicators present', 'Unusual characters or formatting affecting detection')"
         }}
+        
+        The confidence_reason should be a single sentence explaining why the confidence is not 100% or why it's high/low.
         """
         
         language_data = {
@@ -512,6 +515,7 @@ def process_question(question, question_number, row_number=None):
             'original_question': question,
             'detected_language': language_info.get('language', 'Unknown'),
             'confidence': language_info.get('confidence', 0),
+            'confidence_reason': language_info.get('confidence_reason', 'No explanation available'),
             'english_translation': english_translation
         }
         
@@ -528,6 +532,7 @@ def process_question(question, question_number, row_number=None):
             'original_question': question,
             'detected_language': 'Error',
             'confidence': 0,
+            'confidence_reason': 'Processing error occurred',
             'english_translation': f'Translation error: {str(e)}'
         }
         
@@ -548,8 +553,8 @@ def download_results():
         
         # Create DataFrame for Excel export
         df = pd.DataFrame(results)
-        df = df[['original_question', 'detected_language', 'confidence', 'english_translation']]
-        df.columns = ['Original Question', 'Detected Language', 'Confidence (%)', 'English Translation']
+        df = df[['original_question', 'detected_language', 'confidence', 'confidence_reason', 'english_translation']]
+        df.columns = ['Original Question', 'Detected Language', 'Confidence (%)', 'Confidence Reason', 'English Translation']
         
         # Create temporary file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')

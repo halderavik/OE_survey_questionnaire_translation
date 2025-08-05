@@ -297,6 +297,13 @@
             font-weight: 600;
         }
 
+        .confidence-reason {
+            max-width: 300px;
+            font-size: 0.9rem;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+
         .confidence-medium {
             color: #ffc107;
             font-weight: 600;
@@ -477,7 +484,8 @@
                                 <th onclick="sortTable(0)">Original Question ↕</th>
                                 <th onclick="sortTable(1)">Detected Language ↕</th>
                                 <th onclick="sortTable(2)">Confidence (%) ↕</th>
-                                <th onclick="sortTable(3)">English Translation ↕</th>
+                                <th onclick="sortTable(3)">Confidence Reason ↕</th>
+                                <th onclick="sortTable(4)">English Translation ↕</th>
                             </tr>
                         </thead>
                         <tbody id="resultsBody">
@@ -870,6 +878,7 @@
                     <td>${escapeHtml(row.original_question)}</td>
                     <td>${escapeHtml(row.detected_language)}</td>
                     <td class="${getConfidenceClass(row.confidence)}">${row.confidence}%</td>
+                    <td class="confidence-reason">${escapeHtml(row.confidence_reason || 'No explanation available')}</td>
                     <td>${escapeHtml(row.english_translation)}</td>
                 `;
                 tbody.appendChild(tr);
