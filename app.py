@@ -342,7 +342,7 @@ def process_question(question, question_number, row_number=None):
         
         # First, detect language
         language_prompt = f"""
-        Analyze the following text and provide the detected language, confidence score, and a brief explanation for the confidence level.
+        Analyze the following text and provide the detected language, confidence score, and a detailed explanation for the confidence level.
         
         Text: "{question}"
         
@@ -350,10 +350,15 @@ def process_question(question, question_number, row_number=None):
         {{
             "language": "detected_language_name",
             "confidence": confidence_score,
-            "confidence_reason": "Brief explanation of why this confidence score was assigned (e.g., 'Clear French vocabulary and grammar patterns', 'Mixed language indicators present', 'Unusual characters or formatting affecting detection')"
+            "confidence_reason": "Detailed explanation of why this specific confidence score was assigned, including both positive indicators AND reasons why it's not 100% (e.g., 'Clear Hindi vocabulary and script patterns, but some words may have multiple language origins or the text contains formatting that could affect detection', 'Strong French grammar indicators, though some technical terms or abbreviations might be from other languages', 'Mixed language indicators present with some words clearly from one language but others ambiguous')"
         }}
         
-        The confidence_reason should be a single sentence explaining why the confidence is not 100% or why it's high/low.
+        The confidence_reason should explain:
+        1. What positive indicators support the detected language
+        2. Why the confidence is not 100% (what factors create uncertainty)
+        3. What specific elements might be causing the uncertainty
+        
+        Be specific about the reasons for uncertainty, not just positive indicators.
         """
         
         language_data = {
